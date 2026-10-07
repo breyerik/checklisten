@@ -832,12 +832,6 @@ const TEMPLATES = {
       "id": "ohne-8-4"
      },
      {
-      "text": "Kellerfenster einsetzen",
-      "sub": true,
-      "header": false,
-      "id": "ohne-8-5"
-     },
-     {
       "text": "Deckenfugen der Betondecken spachteln",
       "sub": true,
       "header": false,
