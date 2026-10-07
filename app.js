@@ -15,7 +15,9 @@ function list(){
     <div class="muted">${p.addr?esc(p.addr)+' · ':''}${TEMPLATES[p.tpl].title}</div>
     <div class="muted">${g.d} von ${g.n} erledigt (${g.pc} %)</div><div class="bar"><i style="width:${g.pc}%"></i></div></a>
     <button class="del" data-del="${p.id}">Löschen</button></div>`}
-  main.innerHTML=h+'<button class="fab" id="add">+ Neues Bauvorhaben</button>';
+  main.innerHTML=h+'<div class="tools bk"><button id="bkSave">Sichern</button><button id="bkLoad">Wiederherstellen</button></div><button class="fab" id="add">+ Neues Bauvorhaben</button>';
+  $('#bkSave').onclick=async()=>{const r=await shareOrDownload(makeBackup(st),backupName());if(r==='downloaded')alert('Die Sicherung wurde heruntergeladen.')};
+  $('#bkLoad').onclick=()=>{$('#bkFile').value='';$('#bkFile').click()};
   $('#add').onclick=()=>{$('#newForm').reset();$('#dlg').showModal()};
   main.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const p=st.projects.find(x=>x.id===b.dataset.del);
     if(confirm(`„${p.name}“ wirklich löschen? Alle Haken gehen verloren.`)){st.projects=st.projects.filter(x=>x!==p);save();list()}});
@@ -47,5 +49,10 @@ $('#back').onclick=()=>{location.hash=''};
 $('#dlg').addEventListener('close',()=>{if($('#dlg').returnValue!=='ok')return;const f=new FormData($('#newForm'));
   const p={id:Date.now().toString(36),name:f.get('name').trim(),addr:f.get('addr').trim(),tpl:f.get('tpl'),done:{},open:{0:true},created:Date.now()};
   st.projects.unshift(p);save();location.hash='#/'+p.id});
+$('#bkFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  const r=parseBackup(await f.text(),TEMPLATES);if(!r.ok){alert(r.error);return}
+  const n=r.state.projects.length,dt=r.exported?new Date(r.exported).toLocaleString('de-DE'):'unbekannt';
+  if(!confirm(`Sicherung vom ${dt} mit ${n} Bauvorhaben wiederherstellen?\n\nDer aktuelle Stand auf diesem Gerät (${st.projects.length} Bauvorhaben) wird dabei ERSETZT.`))return;
+  st=r.state;save();location.hash='';list();alert('Wiederhergestellt.')};
 addEventListener('hashchange',route);route();
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');
