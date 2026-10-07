@@ -898,7 +898,7 @@ const TEMPLATES = {
       "id": "ohne-8-15"
      },
      {
-      "text": "Sofern nicht vor Innenputz erfolgt: GL Platten einbauen lassen",
+      "text": "Sofern nicht vor Innenputz erfolgt: GK Platten einbauen lassen",
       "sub": true,
       "header": false,
       "id": "ohne-8-16"
@@ -1182,7 +1182,7 @@ const TEMPLATES = {
       "id": "mit-1-7"
      },
      {
-      "text": "wenn Wärmepumpe, Antrag für Tiefenbohrung stellen – über eine Fachfirma (zB Horter)",
+      "text": "wenn Wärmepumpe, Antrag für Tiefenbohrung stellen – über eine Fachfirma (zB Hoorter)",
       "sub": false,
       "header": false,
       "id": "mit-1-8"
@@ -1610,7 +1610,7 @@ const TEMPLATES = {
       "id": "mit-5-23"
      },
      {
-      "text": "Bei LWZ Klärung Wanddurchbrüche, diese im Hintermauerwerk EG/OG einplanen / ebenso im Verblendmauerwerg",
+      "text": "Bei LWZ Klärung Wanddurchbrüche, diese im Hintermauerwerk EG/OG einplanen / ebenso im Verblendmauerwerk",
       "sub": false,
       "header": false,
       "id": "mit-5-24"
