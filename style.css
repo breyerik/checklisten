@@ -44,3 +44,10 @@ fieldset{border:1px solid #ddd;border-radius:10px}.radio{display:flex!important;
 .bzr .bzt small{display:block;font-size:11px;color:#8a5a00;font-weight:600}
 .bzr.past{color:#aaa}.bzr.past .chip{opacity:.5}.bzr.next{background:#fff6d6;font-weight:600}
 .chip{font-style:normal;font-size:11px;border:1px solid;border-radius:6px;padding:0 4px;white-space:nowrap;font-weight:400}
+.prtile{margin-top:18px;background:#eef3f9;border:1px solid #c9d8ea;box-shadow:none}.prtile .chev{font-size:26px;color:#1f4e79}
+.prf{display:flex;gap:8px;margin:4px 0 8px;position:sticky;top:calc(env(safe-area-inset-top) + 56px);z-index:3;background:#f2f2f7;padding:4px 0}
+.prf input{flex:1;min-width:0;font-size:17px;padding:11px 12px;border:1px solid #ccc;border-radius:10px;-webkit-appearance:none;appearance:none;background:#fff}
+.prf select{flex:0 1 40%;min-width:0;font-size:16px;padding:10px 8px;border:1px solid #ccc;border-radius:10px;background:#fff;color:#111}
+.prn{margin:2px 4px 8px}.pr{padding:12px 14px}.prt{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.prl{flex:1;min-width:0;line-height:1.3;overflow-wrap:anywhere}.prp{text-align:right;white-space:nowrap;font-size:20px;font-weight:700;color:#1f4e79;font-variant-numeric:tabular-nums}
+.prp small{display:block;font-size:11px;font-weight:600;color:#666}
