@@ -7,7 +7,17 @@ const $=s=>document.querySelector(s), main=$('#main');
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const items=t=>TEMPLATES[t].sections.flatMap(s=>s.items.filter(i=>!i.header));
 function prog(p){const all=items(p.tpl),d=all.filter(i=>p.done[i.id]).length;return{d,n:all.length,pc:Math.round(d*100/all.length)}}
-function route(){const id=location.hash.slice(2);const p=st.projects.find(x=>x.id===id);p?detail(p):list()}
+function route(){const[id,sub]=location.hash.slice(2).split('/');const p=st.projects.find(x=>x.id===id);
+  if(!p)return list();sub==='check'?detail(p):sub==='plan'?plan(p):hub(p)}
+function backTo(label,hash){const b=$('#back');b.textContent=label;b.style.visibility='visible';b.onclick=()=>{location.hash=hash}}
+function hub(p){
+  $('#title').textContent=p.name;backTo('‹ Projekte','');const g=prog(p);
+  main.innerHTML=`${p.addr?`<div class="muted hubaddr">${esc(p.addr)}</div>`:''}
+  <a class="card tile" href="#/${p.id}/check"><span class="ti">☑︎</span><span class="tx"><b>Checkliste</b><span class="muted">${TEMPLATES[p.tpl].title}</span>
+    <span class="muted">${g.d} von ${g.n} erledigt (${g.pc} %)</span><span class="bar"><i style="width:${g.pc}%"></i></span></span></a>
+  <a class="card tile" href="#/${p.id}/plan"><span class="ti">📅</span><span class="tx"><b>Bauzeitenplan</b><span class="muted">${esc(bzpTeaser(p))}</span></span></a>`;
+}
+function plan(p){$('#title').textContent=p.name;backTo('‹ Übersicht','#/'+p.id);bzpView(p,main)}
 function list(){
   $('#title').textContent='Bauvorhaben';$('#back').style.visibility='hidden';
   let h=st.projects.length?'':'<div class="empty">Noch kein Bauvorhaben angelegt.<br>Tippe auf „+ Neues Bauvorhaben“.</div>';
@@ -24,7 +34,7 @@ function list(){
     if(confirm(`„${p.name}“ wirklich löschen? Alle Haken gehen verloren.`)){st.projects=st.projects.filter(x=>x!==p);st.deleted=st.deleted||{};st.deleted[p.id]=Date.now();save();list()}});
 }
 function detail(p){
-  $('#title').textContent=p.name;$('#back').style.visibility='visible';
+  $('#title').textContent=p.name;backTo('‹ Übersicht','#/'+p.id);
   const g=prog(p);
   let h=`<div class="card"><div class="muted">${p.addr?esc(p.addr)+'<br>':''}${TEMPLATES[p.tpl].title}</div>
   <div style="margin-top:6px"><b>${g.d} von ${g.n} erledigt (${g.pc} %)</b></div><div class="bar"><i style="width:${g.pc}%"></i></div>
@@ -47,7 +57,6 @@ function detail(p){
   $('#tg').onclick=()=>{hideDone=!hideDone;detail(p)};
   $('#ex').onclick=()=>{p.open={};TEMPLATES[p.tpl].sections.forEach((_,i)=>p.open[i]=true);store();detail(p)};
 }
-$('#back').onclick=()=>{location.hash=''};
 $('#dlg').addEventListener('close',()=>{if($('#dlg').returnValue!=='ok')return;const f=new FormData($('#newForm'));
   const p={id:Date.now().toString(36),name:f.get('name').trim(),addr:f.get('addr').trim(),tpl:f.get('tpl'),done:{},open:{0:true},created:Date.now()};p.mod=p.created;
   st.projects.unshift(p);save();location.hash='#/'+p.id});
@@ -61,5 +70,5 @@ $('#bkFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   st={...r.state,deleted:del};save();location.hash='';list();alert('Wiederhergestellt.')};
 addEventListener('hashchange',route);route();
 function rerender(){const y=scrollY;route();scrollTo(0,y)}
-Sync&&Sync.init({get:()=>st,set:s=>{st=s;store();rerender()}});
+Sync&&Sync.init({get:()=>st,set:s=>{st=s;store();rerender()},auth:in_=>{if(!in_)bzpClear();rerender()}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');

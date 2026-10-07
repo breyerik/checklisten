@@ -7,7 +7,7 @@ function mergeProject(l,r){
     const d=Math.max(+(l.done||{})[id]||0,+(r.done||{})[id]||0),u=Math.max(+(l.undone||{})[id]||0,+(r.undone||{})[id]||0);
     if(d&&d>=u)done[id]=d;else if(u)undone[id]=u;}
   const n=ts(r)>ts(l)?r:l;
-  return{...r,...l,name:n.name,addr:n.addr,tpl:n.tpl,created:Math.min(l.created||Infinity,r.created||Infinity)===Infinity?undefined:Math.min(l.created||Infinity,r.created||Infinity),
+  return{...r,...l,name:n.name,addr:n.addr,tpl:n.tpl,bzpSheet:n.bzpSheet,created:Math.min(l.created||Infinity,r.created||Infinity)===Infinity?undefined:Math.min(l.created||Infinity,r.created||Infinity),
     mod:Math.max(l.mod||0,r.mod||0)||undefined,done,undone,open:l.open||{}};
 }
 // local = Gerätestand, remote = Cloud-Stand. UI-Zustand (open) bleibt lokal.
@@ -108,13 +108,15 @@ const Sync=typeof window==='undefined'?null:(()=>{
   }
   function changed(){if(!on||!ss.session)return;ss.dirty=true;keep();set(navigator.onLine?'pending':'offline');clearTimeout(timer);timer=setTimeout(sync,1500)}
   async function signIn(email,password){
-    setSession(await call('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email,password}}));await sync()}
+    setSession(await call('/auth/v1/token?grant_type=password',{method:'POST',auth:false,body:{email,password}}));await sync();H.auth&&H.auth(true)}
   async function signUp(email,password){
     const j=await call('/auth/v1/signup?redirect_to='+encodeURIComponent(redirect()),{method:'POST',auth:false,body:{email,password}});
-    if(j&&j.access_token){setSession(j);await sync();return'in'}return'confirm'}
+    if(j&&j.access_token){setSession(j);await sync();H.auth&&H.auth(true);return'in'}return'confirm'}
   async function recover(email){await call('/auth/v1/recover?redirect_to='+encodeURIComponent(redirect()),{method:'POST',auth:false,body:{email}})}
   async function signOut(quiet){if(ss.session){try{await call('/auth/v1/logout',{method:'POST'})}catch(e){}}
-    ss.session=null;ss.dirty=false;keep();set('off')}
+    ss.session=null;ss.dirty=false;keep();set('off');H.auth&&H.auth(false)}
+  // Authentifizierter Lesezugriff für weitere Daten (z. B. Bauzeitenplan)
+  async function api(path){if(!ss.session)throw new HttpErr(401,'Nicht angemeldet');await token();return call(path)}
   // Konto-Dialog
   function account(msg=''){
     const d=$('#acct'),u=ss.session&&ss.session.user,err=status==='err'&&detail?`<p class="msg err">Letzter Fehler: ${e$(detail)}</p>`:'';
@@ -175,5 +177,5 @@ const Sync=typeof window==='undefined'?null:(()=>{
     setInterval(()=>{if(document.visibilityState==='visible'&&ss.session)sync()},60000);
     handleRedirect().then(sync);
   }
-  return{init,changed,sync,account,signIn,signOut,get status(){return status},get user(){return ss.session&&ss.session.user}};
+  return{init,changed,sync,account,signIn,signOut,api,get status(){return status},get user(){return ss.session&&ss.session.user}};
 })();
