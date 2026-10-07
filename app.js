@@ -1,7 +1,8 @@
 const KEY='bs-checklisten-v1';
 let st=JSON.parse(localStorage.getItem(KEY)||'{"projects":[]}');
 let hideDone=false;
-const save=()=>localStorage.setItem(KEY,JSON.stringify(st));
+const store=()=>localStorage.setItem(KEY,JSON.stringify(st));
+const save=()=>{store();Sync&&Sync.changed()};
 const $=s=>document.querySelector(s), main=$('#main');
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const items=t=>TEMPLATES[t].sections.flatMap(s=>s.items.filter(i=>!i.header));
@@ -20,7 +21,7 @@ function list(){
   $('#bkLoad').onclick=()=>{$('#bkFile').value='';$('#bkFile').click()};
   $('#add').onclick=()=>{$('#newForm').reset();$('#dlg').showModal()};
   main.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const p=st.projects.find(x=>x.id===b.dataset.del);
-    if(confirm(`„${p.name}“ wirklich löschen? Alle Haken gehen verloren.`)){st.projects=st.projects.filter(x=>x!==p);save();list()}});
+    if(confirm(`„${p.name}“ wirklich löschen? Alle Haken gehen verloren.`)){st.projects=st.projects.filter(x=>x!==p);st.deleted=st.deleted||{};st.deleted[p.id]=Date.now();save();list()}});
 }
 function detail(p){
   $('#title').textContent=p.name;$('#back').style.visibility='visible';
@@ -39,20 +40,26 @@ function detail(p){
       h+=`<label class="item ${i.sub?'sub':''} ${c?'checked':''}"><input type="checkbox" data-id="${i.id}" ${c?'checked':''}><span>${esc(i.text)}</span></label>`}
     h+='</details>'});
   main.innerHTML=h;
-  main.querySelectorAll('input[data-id]').forEach(cb=>cb.onchange=()=>{cb.checked?p.done[cb.dataset.id]=Date.now():delete p.done[cb.dataset.id];save();
+  main.querySelectorAll('input[data-id]').forEach(cb=>cb.onchange=()=>{const id=cb.dataset.id,t=Date.now();p.undone=p.undone||{};
+    if(cb.checked){p.done[id]=t;delete p.undone[id]}else{delete p.done[id];p.undone[id]=t}p.mod=t;save();
     const y=scrollY;detail(p);scrollTo(0,y)});
-  main.querySelectorAll('details').forEach(d=>d.ontoggle=()=>{p.open=p.open||{};p.open[d.dataset.si]=d.open;save()});
+  main.querySelectorAll('details').forEach(d=>d.ontoggle=()=>{p.open=p.open||{};p.open[d.dataset.si]=d.open;store()});
   $('#tg').onclick=()=>{hideDone=!hideDone;detail(p)};
-  $('#ex').onclick=()=>{p.open={};TEMPLATES[p.tpl].sections.forEach((_,i)=>p.open[i]=true);save();detail(p)};
+  $('#ex').onclick=()=>{p.open={};TEMPLATES[p.tpl].sections.forEach((_,i)=>p.open[i]=true);store();detail(p)};
 }
 $('#back').onclick=()=>{location.hash=''};
 $('#dlg').addEventListener('close',()=>{if($('#dlg').returnValue!=='ok')return;const f=new FormData($('#newForm'));
-  const p={id:Date.now().toString(36),name:f.get('name').trim(),addr:f.get('addr').trim(),tpl:f.get('tpl'),done:{},open:{0:true},created:Date.now()};
+  const p={id:Date.now().toString(36),name:f.get('name').trim(),addr:f.get('addr').trim(),tpl:f.get('tpl'),done:{},open:{0:true},created:Date.now()};p.mod=p.created;
   st.projects.unshift(p);save();location.hash='#/'+p.id});
 $('#bkFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   const r=parseBackup(await f.text(),TEMPLATES);if(!r.ok){alert(r.error);return}
   const n=r.state.projects.length,dt=r.exported?new Date(r.exported).toLocaleString('de-DE'):'unbekannt';
   if(!confirm(`Sicherung vom ${dt} mit ${n} Bauvorhaben wiederherstellen?\n\nDer aktuelle Stand auf diesem Gerät (${st.projects.length} Bauvorhaben) wird dabei ERSETZT.`))return;
-  st=r.state;save();location.hash='';list();alert('Wiederhergestellt.')};
+  const keepIds=new Set(r.state.projects.map(p=>p.id)),del={...(st.deleted||{}),...(r.state.deleted||{})},t=Date.now();
+  for(const p of st.projects)if(!keepIds.has(p.id))del[p.id]=t;
+  for(const p of r.state.projects){delete del[p.id];p.mod=Math.max(p.mod||0,t)}
+  st={...r.state,deleted:del};save();location.hash='';list();alert('Wiederhergestellt.')};
 addEventListener('hashchange',route);route();
+function rerender(){const y=scrollY;route();scrollTo(0,y)}
+Sync&&Sync.init({get:()=>st,set:s=>{st=s;store();rerender()}});
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');

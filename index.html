@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="style.css">
 </head><body>
 <header id="bar"><button id="back" class="hdrbtn">‹ Projekte</button><h1 id="title">Bauvorhaben</h1><span class="hdrbtn sp"></span></header>
+<div id="sync" class="sync" hidden role="button"></div>
 <main id="main"></main>
 <dialog id="dlg"><form method="dialog" id="newForm">
 <h2>Neues Bauvorhaben</h2>
@@ -25,5 +26,11 @@
 <div class="row"><button value="cancel" formnovalidate class="sec">Abbrechen</button><button value="ok" class="pri">Anlegen</button></div>
 </form></dialog>
 <input type="file" id="bkFile" accept=".json,application/json" hidden>
-<script src="data.js"></script><script src="backup.js"></script><script src="app.js"></script>
+<dialog id="acct"></dialog>
+<dialog id="choice"><form method="dialog"><h2>Daten zusammenführen</h2><p></p>
+<div class="row"><button value="merge" class="pri">Zusammenführen</button></div>
+<div class="row"><button value="remote" class="sec">Nur Cloud-Stand</button><button value="local" class="sec">Nur dieses Gerät</button></div>
+<p class="muted">„Zusammenführen“ behält alle Bauvorhaben und Haken von beiden Seiten. Bei „Nur Cloud-Stand“ bzw. „Nur dieses Gerät“ wird der jeweils andere Stand verworfen.</p>
+<div class="row"><button value="cancel" class="sec">Abbrechen (abmelden)</button></div></form></dialog>
+<script src="config.js"></script><script src="data.js"></script><script src="backup.js"></script><script src="sync.js"></script><script src="app.js"></script>
 </body></html>

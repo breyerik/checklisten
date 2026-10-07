@@ -32,3 +32,6 @@ fieldset{border:1px solid #ddd;border-radius:10px}.radio{display:flex!important;
 .row{display:flex;gap:10px;margin-top:14px}.row button{flex:1;padding:14px;border-radius:10px;border:0;font-size:17px}
 .pri{background:#1f4e79;color:#fff}.sec{background:#e5e5ea}
 .tools.bk{margin:16px 0 80px}
+.sync{background:#e8eef5;color:#1f4e79;font-size:13px;text-align:center;padding:7px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sync.offline,.sync.pending{background:#fff6e0;color:#8a5a00}.sync.err,.sync.relogin{background:#fdecec;color:#b00}.sync.off{color:#555}
+.msg{font-size:14px;color:#1f4e79;min-height:0}.msg.err{color:#b00}dialog a{color:#1f4e79}
