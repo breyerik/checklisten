@@ -115,8 +115,8 @@ const Sync=typeof window==='undefined'?null:(()=>{
   async function recover(email){await call('/auth/v1/recover?redirect_to='+encodeURIComponent(redirect()),{method:'POST',auth:false,body:{email}})}
   async function signOut(quiet){if(ss.session){try{await call('/auth/v1/logout',{method:'POST'})}catch(e){}}
     ss.session=null;ss.dirty=false;keep();set('off');H.auth&&H.auth(false)}
-  // Authentifizierter Lesezugriff für weitere Daten (z. B. Bauzeitenplan)
-  async function api(path){if(!ss.session)throw new HttpErr(401,'Nicht angemeldet');await token();return call(path)}
+  // Authentifizierter Zugriff für weitere Daten (Bauzeitenplan, Preise, Besuche); opts wie bei call()
+  async function api(path,opts){if(!ss.session)throw new HttpErr(401,'Nicht angemeldet');await token();return call(path,opts)}
   // Konto-Dialog
   function account(msg=''){
     const d=$('#acct'),u=ss.session&&ss.session.user,err=status==='err'&&detail?`<p class="msg err">Letzter Fehler: ${e$(detail)}</p>`:'';
