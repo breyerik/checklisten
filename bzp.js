@@ -42,7 +42,53 @@ function bzpClassify(rows,today=new Date()){
 const bzpFmt=t=>{if(/^\d{4}-\d{2}-\d{2}$/.test(t||'')){const[y,m,d]=t.split('-').map(Number);
   return new Date(y,m-1,d).toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit',year:'2-digit'})}return t||'–'};
 const bzpStand=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'')?s.split('-').reverse().join('.'):(s||'unbekannt');
-if(typeof module!=='undefined')module.exports={bzpMatch,bzpParse,bzpClassify,bzpKeys,bzpFmt,bzpStand};
+const bzpSlug=s=>String(s||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/ß/g,'ss').replace(/[^A-Za-z0-9]+/g,'_').replace(/^_|_$/g,'').slice(0,60)||'BV';
+const bzpFileName=(bv,stand)=>{const st=/^\d{4}-\d{2}-\d{2}$/.test(stand||'')?stand:(String(stand||'').replace(/\./g,'-').replace(/[^0-9-]/g,'').replace(/-+/g,'-').replace(/^-|-$/g,'')||new Date().toISOString().slice(0,10));
+  return`Bauzeitenplan_${bzpSlug(bv)}_${st}.pdf`};
+// Nur Zeichen, die die PDF-Standardschrift (WinAnsi) darstellen kann
+const BZP_WIN='€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ';
+const bzpAnsi=s=>String(s??'').replace(/\r\n?/g,'\n').replace(/[\u2010-\u2012]/g,'-').replace(/\u2212/g,'-').replace(/[\u00a0\u2007\u202f]/g,' ')
+  .replace(/[^\n\x20-\x7e\xa0-\xff]/gu,c=>BZP_WIN.includes(c)?c:'?');
+// PDF: Querformat A4, Tabelle wie in der Ansicht (Firma, Leistung, Status, Termin)
+function bzpPdf(J,{bv,stand,sheetName,sheetTitle,rows,legend}){
+  const doc=new J({unit:'mm',format:'a4',orientation:'landscape',compress:true});
+  const W=doc.internal.pageSize.getWidth(),H=doc.internal.pageSize.getHeight(),M=12,CW=W-2*M,BOT=H-12;
+  const cols=[
+    {k:'firma',label:'Firma',w:52},
+    {k:'leistung',label:'Leistung',w:CW-52-38-48},
+    {k:'status',label:'Status',w:38},
+    {k:'termin',label:'Termin',w:48}];
+  const lg=legend||{};
+  const data=rows.map(r=>{const st=r.farbe&&lg[r.farbe];return{firma:r.firma||'',leistung:r.leistung||'',status:st||'',termin:bzpFmt(r.termin),next:!!r.next,past:!!r.past}});
+  const title='Bauzeitenplan '+(bv||'');
+  const standTxt=bzpStand(stand);
+  const sub=[sheetTitle&&sheetName&&bzpNorm(sheetTitle).includes(bzpNorm(sheetName).replace(/^bv /,''))?sheetTitle:(sheetName||'')+(sheetTitle?' · '+sheetTitle:''),'Stand: '+standTxt].filter(Boolean).join('  ·  ');
+  const drawHead=()=>{let y=M;
+    doc.setFont('helvetica','bold');doc.setFontSize(16);doc.setTextColor(31,78,121);doc.text(bzpAnsi(title),M,y+5);y+=9;
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(80,80,80);doc.text(bzpAnsi(sub),M,y+3.5);y+=7;
+    doc.setFillColor(31,78,121);doc.rect(M,y,CW,7,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(255,255,255);
+    let x=M;for(const c of cols){doc.text(bzpAnsi(c.label),x+1.5,y+4.8);x+=c.w}return y+7};
+  let y=drawHead();
+  const rowH=(cells)=>{doc.setFont('helvetica','normal');doc.setFontSize(9);let mh=6;
+    cells.forEach((t,i)=>{const lines=doc.splitTextToSize(bzpAnsi(t),cols[i].w-3);mh=Math.max(mh,lines.length*4+2)});return{mh,lines:cells.map((t,i)=>doc.splitTextToSize(bzpAnsi(t),cols[i].w-3))}};
+  let alt=false;
+  for(const r of data){
+    const cells=[r.firma,r.leistung,r.status,r.termin];
+    let {mh,lines}=rowH(cells);
+    if(y+mh>BOT){doc.addPage();y=drawHead();alt=false}
+    if(r.next)doc.setFillColor(255,246,214);else if(alt)doc.setFillColor(245,247,250);else doc.setFillColor(255,255,255);
+    doc.rect(M,y,CW,mh,'F');
+    doc.setDrawColor(230,230,230);doc.setLineWidth(0.2);doc.line(M,y+mh,M+CW,y+mh);
+    doc.setFont('helvetica','normal');doc.setFontSize(9);doc.setTextColor(r.past?170:17,r.past?170:17,r.past?170:17);
+    let x=M;lines.forEach((ls,i)=>{ls.forEach((l,j)=>doc.text(l,x+1.5,y+4+j*4));x+=cols[i].w});
+    y+=mh;alt=!alt}
+  if(!data.length){doc.setFont('helvetica','normal');doc.setFontSize(11);doc.setTextColor(80,80,80);doc.text('Keine Termine.',M,y+6)}
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,120,120);
+    doc.text(bzpAnsi(`Bauzeitenplan · ${bv||''} · Stand ${standTxt}`),M,H-6);doc.text(`Seite ${i} von ${pages}`,W-M,H-6,{align:'right'})}
+  return doc;
+}
+if(typeof module!=='undefined')module.exports={bzpMatch,bzpParse,bzpClassify,bzpKeys,bzpFmt,bzpStand,bzpSlug,bzpFileName,bzpAnsi,bzpPdf};
 
 // ---------- Browser ----------
 function bzpCache(){try{const c=JSON.parse(localStorage.getItem(BZP_CACHE)||'null');const u=Sync&&Sync.user;return c&&u&&c.uid===u.id?c:null}catch(e){return null}}
@@ -80,7 +126,7 @@ async function bzpView(p,el){
     if(p.bzpSheet)el.insertAdjacentHTML('afterbegin',`<div class="card msg err">Das gewählte Blatt „${esc(p.bzpSheet)}“ gibt es im aktuellen Plan nicht mehr.</div>`);
     return}
   const rows=bzpClassify(sh.rows),lg=sh.legend||{};
-  let h=head+`<div class="tools"><button id="bzPast">${bzpHidePast?'Vergangene anzeigen':'Vergangene ausblenden'}</button><button id="bzSheet">Blatt ändern</button></div>`;
+  let h=head+`<div class="tools"><button id="bzPast">${bzpHidePast?'Vergangene anzeigen':'Vergangene ausblenden'}</button><button id="bzSheet">Blatt ändern</button><button id="bzPdf">Als PDF herunterladen</button></div>`;
   if(!rows.length)h+='<div class="empty">In diesem Blatt stehen noch keine Termine.</div>';
   else{h+='<div class="card bzp">';let last=null;
     for(const x of rows){if(bzpHidePast&&x.past)continue;
@@ -95,4 +141,27 @@ async function bzpView(p,el){
     el.innerHTML=head+`<div class="card"><p><b>Blatt wählen</b></p>${sheets.map((s,i)=>`<button class="pick ${s.name===sh.name?'cur':''}" data-i="${i}"><b>${esc(s.name)}</b><span class="muted">${esc(s.title||'')} · ${s.rows.length} Einträge</span></button>`).join('')}
       <button class="pick" data-i="auto"><b>Automatisch zuordnen</b></button></div>`;
     el.querySelectorAll('.pick').forEach(b=>b.onclick=()=>{p.bzpSheet=b.dataset.i==='auto'?'':sheets[+b.dataset.i].name;p.mod=Date.now();save();bzpView(p,el)})};
+  $('#bzPdf').onclick=()=>bzpSharePdf(p,r.row,sh,$('#bzPdf'));
+}
+let bzpPdfLib=null;
+const bzpLoadPdf=()=>bzpPdfLib||(bzpPdfLib=new Promise((res,rej)=>{if(window.jspdf)return res(window.jspdf.jsPDF);
+  const s=document.createElement('script');s.src='vendor/jspdf.umd.min.js';s.onload=()=>res(window.jspdf.jsPDF);s.onerror=()=>{bzpPdfLib=null;rej(new Error('PDF-Bibliothek konnte nicht geladen werden'))};document.head.appendChild(s)}));
+async function bzpSharePdf(p,row,sh,btn){
+  const t=btn.textContent;btn.disabled=true;btn.textContent='PDF wird erstellt …';
+  const stand=row.stand||row.data.stand||'';
+  const visible=bzpClassify(sh.rows).filter(x=>!(bzpHidePast&&x.past));
+  let blob,name=bzpFileName(p.name,stand);
+  try{const J=await bzpLoadPdf();
+    blob=bzpPdf(J,{bv:p.name,stand,sheetName:sh.name,sheetTitle:sh.title,rows:visible,legend:sh.legend||{}}).output('blob')}
+  catch(e){alert('Das PDF konnte nicht erstellt werden: '+e.message);return}
+  finally{btn.disabled=false;btn.textContent=t}
+  const file=new File([blob],name,{type:'application/pdf'});
+  const dl=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)};
+  let can=false;try{can=!!(navigator.canShare&&navigator.canShare({files:[file]}))}catch(e){}
+  if(!can){dl();return}
+  let d=$('#bzPdfDlg');if(!d){d=document.createElement('dialog');d.id='bzPdfDlg';document.body.appendChild(d)}
+  d.innerHTML=`<h2>Bauzeitenplan als PDF</h2><p class="muted">${esc(name)} · ${Math.max(1,Math.round(blob.size/1024))} KB</p>
+    <div class="row"><button class="pri" id="bzpShare">Teilen …</button></div><div class="row"><button class="sec" id="bzpDl">Herunterladen</button><button class="sec" id="bzpX">Schließen</button></div>`;
+  d.querySelector('#bzpShare').onclick=async()=>{try{await navigator.share({files:[file],title:name})}catch(e){if(e.name!=='AbortError')dl()}d.close()};
+  d.querySelector('#bzpDl').onclick=()=>{dl();d.close()};d.querySelector('#bzpX').onclick=()=>d.close();d.showModal();
 }
