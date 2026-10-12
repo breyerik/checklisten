@@ -795,6 +795,12 @@ const TEMPLATES = {
       "sub": false,
       "header": false,
       "id": "ohne-7-22"
+     },
+     {
+      "text": "Gewindestangen WC prüfen (nach Innenputz: prüfen, ob die Gewindestangen fürs WC problemlos montiert werden können)",
+      "sub": false,
+      "header": false,
+      "id": "ohne-7-23"
      }
     ]
    },
@@ -1989,6 +1995,12 @@ const TEMPLATES = {
       "sub": false,
       "header": false,
       "id": "mit-8-21"
+     },
+     {
+      "text": "Gewindestangen WC prüfen (nach Innenputz: prüfen, ob die Gewindestangen fürs WC problemlos montiert werden können)",
+      "sub": false,
+      "header": false,
+      "id": "mit-8-22"
      }
     ]
    },

@@ -1,8 +1,11 @@
 const KEY='bs-checklisten-v1';
-let st=JSON.parse(localStorage.getItem(KEY)||'{"projects":[]}');
+let _raw=JSON.parse(localStorage.getItem(KEY)||'{"projects":[]}');
+let st=migrateState(_raw);
+const _schemaBumped=st.schema!==(_raw.schema||0);
 let hideDone=false;
 const store=()=>localStorage.setItem(KEY,JSON.stringify(st));
 const save=()=>{store();Sync&&Sync.changed()};
+if(_schemaBumped)store();
 const $=s=>document.querySelector(s), main=$('#main');
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const items=t=>TEMPLATES[t].sections.flatMap(s=>s.items.filter(i=>!i.header));
@@ -76,6 +79,7 @@ $('#bkFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
   st={...r.state,deleted:del};save();location.hash='';list();alert('Wiederhergestellt.')};
 addEventListener('hashchange',route);route();
 function rerender(){const y=scrollY;route();scrollTo(0,y)}
-Sync&&Sync.init({get:()=>st,set:s=>{st=s;store();rerender()},auth:in_=>{if(!in_){bzpClear();prClear()}else BE&&BE.kick(500);rerender()}});
+Sync&&Sync.init({get:()=>st,set:s=>{st=migrateState(s);store();rerender()},auth:in_=>{if(!in_){bzpClear();prClear()}else BE&&BE.kick(500);rerender()}});
+if(_schemaBumped)Sync&&Sync.changed();
 BE&&BE.kick(2000);
 if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');

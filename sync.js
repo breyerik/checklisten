@@ -1,5 +1,21 @@
 // Cloud-Sync über Supabase (Auth + REST per fetch, keine externe Bibliothek)
 // ---------- Reine Merge-Logik (auch in Node testbar) ----------
+// Schema-Migrationen: Template-Punkte leben in TEMPLATES (data.js).
+// Projekte speichern nur done/undone per id — neue Punkte erscheinen automatisch unchecked.
+// migrateState normalisiert die Projektform und setzt schema (idempotent, Haken bleiben).
+const SCHEMA=10; // v10: Gewindestangen WC prüfen (nach Innenputz) in beiden Vorlagen
+function migrateState(st){
+  st=st&&typeof st==='object'?st:{projects:[]};
+  const projects=(st.projects||[]).map(p=>{
+    if(!p||typeof p!=='object')return p;
+    const done=p.done&&typeof p.done==='object'&&!Array.isArray(p.done)?p.done:{};
+    const out={...p,done};
+    if(p.undone!=null&&(typeof p.undone!=='object'||Array.isArray(p.undone)))delete out.undone;
+    else if(p.undone)out.undone=p.undone;
+    return out;
+  });
+  return{...st,projects,schema:Math.max(+st.schema||0,SCHEMA)};
+}
 const ts=p=>Math.max(p.mod||0,p.created||0);
 function mergeProject(l,r){
   const done={},undone={},ids=new Set([l.done,r.done,l.undone,r.undone].flatMap(o=>Object.keys(o||{})));
@@ -28,7 +44,7 @@ function canon(s){
   return sort({...s,projects:(s.projects||[]).map(({open,...p})=>p)});
 }
 const same=(a,b)=>JSON.stringify(canon(a||{projects:[]}))===JSON.stringify(canon(b||{projects:[]}));
-if(typeof module!=='undefined')module.exports={mergeStates,mergeProject,canon,same};
+if(typeof module!=='undefined')module.exports={mergeStates,mergeProject,canon,same,migrateState,SCHEMA};
 
 // ---------- Client (nur im Browser) ----------
 const Sync=typeof window==='undefined'?null:(()=>{
@@ -92,6 +108,7 @@ const Sync=typeof window==='undefined'?null:(()=>{
           else merged=mergeStates(cur,remote);
           if(c==='remote')for(const p of merged.projects){const o=cur.projects.find(x=>x.id===p.id);if(o)p.open=o.open}
         }else merged=mergeStates(H.get(),remote);
+        merged=migrateState(merged);
         ss.lastUser=uid;ss.dirty=false;keep();
         if(!same(merged,H.get())||JSON.stringify(merged)!==JSON.stringify(H.get()))H.set(merged);
         if(row&&!force&&same(merged,remote)){ss.lastAt=Date.now();keep();set('ok');return}
