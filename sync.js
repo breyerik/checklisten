@@ -3,7 +3,7 @@
 // Schema-Migrationen: Template-Punkte leben in TEMPLATES (data.js).
 // Projekte speichern nur done/undone per id — neue Punkte erscheinen automatisch unchecked.
 // migrateState normalisiert die Projektform und setzt schema (idempotent, Haken bleiben).
-const SCHEMA=10; // v10: Gewindestangen WC prüfen (nach Innenputz) in beiden Vorlagen
+const SCHEMA=11; // v11: Estrich prüfen (Höhen/Ebenheit/Aussparungen) nach Fertigstellung Estrich; v10: Gewindestangen WC
 function migrateState(st){
   st=st&&typeof st==='object'?st:{projects:[]};
   const projects=(st.projects||[]).map(p=>{

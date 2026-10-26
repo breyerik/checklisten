@@ -808,6 +808,12 @@ const TEMPLATES = {
     "title": "Nach Fertigstellung des Estrichs",
     "items": [
      {
+      "text": "Estrich prüfen: Höhen (Fertigfußbodenhöhe/Belagstärken lt. Estrichplan), Ebenheit und Aussparungen kontrollieren",
+      "sub": false,
+      "header": false,
+      "id": "ohne-8-29"
+     },
+     {
       "text": "Nach Verlegung des Estrichs sollte ein Ortstermin mit dem Bauherrn und allen am Bau noch beschäftigten Handwerkern stattfinden, um die anstehenden Arbeiten zu besprechen und zu terminieren.",
       "sub": false,
       "header": false,
@@ -2007,6 +2013,12 @@ const TEMPLATES = {
    {
     "title": "Nach Fertigstellung des Estrichs",
     "items": [
+     {
+      "text": "Estrich prüfen: Höhen (Fertigfußbodenhöhe/Belagstärken lt. Estrichplan), Ebenheit und Aussparungen kontrollieren",
+      "sub": false,
+      "header": false,
+      "id": "mit-9-28"
+     },
      {
       "text": "Nach Verlegung des Estrichs sollte ein Ortstermin mit dem Bauherrn und allen am Bau noch beschäftigten Handwerkern stattfinden, um die anstehenden Arbeiten zu besprechen und zu terminieren.",
       "sub": false,
