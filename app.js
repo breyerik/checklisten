@@ -13,7 +13,7 @@ function prog(p){const all=items(p.tpl),d=all.filter(i=>p.done[i.id]).length;ret
 function route(){const[id,sub,bid,x,eid]=location.hash.slice(2).split('/');if(id==='preise'){if(!(Sync&&Sync.user&&$('#prQ')))preise();return}const p=st.projects.find(x=>x.id===id);
   if(!p)return list();
   if(sub==='besuch'&&x==='e'){const f=$('#beForm');if(f&&f.dataset.h===location.hash)return;return beEntry(p,bid,eid,main)} // Formular nicht neu zeichnen (Eingaben bleiben)
-  beSubView=null;sub==='check'?detail(p):sub==='plan'?plan(p):sub==='besuche'?beList(p,main):sub==='besuch'?beVisit(p,bid,main):hub(p)}
+  beSubView=null;sub==='check'?detail(p):sub==='plan'?plan(p):sub==='besuche'?beList(p,main):sub==='besuch'?beVisit(p,bid,main):sub==='liste'&&glBySlug(bid)&&glFor(p).includes(glBySlug(bid))?glView(p,glBySlug(bid),main):hub(p)}
 function backTo(label,hash){const b=$('#back');b.textContent=label;b.style.visibility='visible';b.onclick=()=>{location.hash=hash}}
 function hub(p){
   $('#title').textContent=p.name;backTo('‹ Projekte','');const g=prog(p);
@@ -21,7 +21,7 @@ function hub(p){
   <a class="card tile" href="#/${p.id}/check"><span class="ti">☑︎</span><span class="tx"><b>Checkliste</b><span class="muted">${TEMPLATES[p.tpl].title}</span>
     <span class="muted">${g.d} von ${g.n} erledigt (${g.pc} %)</span><span class="bar"><i style="width:${g.pc}%"></i></span></span></a>
   <a class="card tile" href="#/${p.id}/plan"><span class="ti">📅</span><span class="tx"><b>Bauzeitenplan</b><span class="muted">${esc(bzpTeaser(p))}</span></span></a>
-  <a class="card tile" href="#/${p.id}/besuche"><span class="ti">📷</span><span class="tx"><b>Besuche</b><span class="muted" id="beTeaser">Besuchsprotokolle mit Fotos</span></span></a>`;
+  <a class="card tile" href="#/${p.id}/besuche"><span class="ti">📷</span><span class="tx"><b>Besuche</b><span class="muted" id="beTeaser">Besuchsprotokolle mit Fotos</span></span></a>${glTiles(p)}`;
   beTeaser(p,$('#beTeaser'));
 }
 function preise(){$('#title').textContent='Preisdatenbank';backTo('‹ Projekte','');prView(main)}
