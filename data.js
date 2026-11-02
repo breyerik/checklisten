@@ -755,6 +755,12 @@ const TEMPLATES = {
       "id": "ohne-7-15"
      },
      {
+      "text": "Bei der Haustechnik-Installationsdurchsprache vor Ort die Position des Heizkreisverteilers (HKV) nochmal durchsprechen und ggf. den Elektriker informieren.",
+      "sub": false,
+      "header": false,
+      "id": "ohne-7-24"
+     },
+     {
       "text": "Lüftungsleitungen in Steigestränge legen lassen und danach alle DD schließen lassen",
       "sub": false,
       "header": false,
@@ -1965,6 +1971,12 @@ const TEMPLATES = {
       "sub": false,
       "header": false,
       "id": "mit-8-15"
+     },
+     {
+      "text": "Bei der Haustechnik-Installationsdurchsprache vor Ort die Position des Heizkreisverteilers (HKV) nochmal durchsprechen und ggf. den Elektriker informieren.",
+      "sub": false,
+      "header": false,
+      "id": "mit-8-23"
      },
      {
       "text": "Lüftungsleitungen in Steigestränge legen lassen und danach alle DD schließen lassen",
