@@ -1925,6 +1925,12 @@ const TEMPLATES = {
       "id": "mit-8-24"
      },
      {
+      "text": "Nur Haus mit Keller: Anwendungen in Kellerräumen festlegen und entsprechende Hebeanlage beim Handwerker freigeben lassen",
+      "sub": false,
+      "header": false,
+      "id": "mit-8-25"
+     },
+     {
       "text": "nach Fenstermontage:",
       "sub": false,
       "header": true,
