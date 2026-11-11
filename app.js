@@ -10,10 +10,10 @@ const $=s=>document.querySelector(s), main=$('#main');
 const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const items=t=>TEMPLATES[t].sections.flatMap(s=>s.items.filter(i=>!i.header));
 function prog(p){const all=items(p.tpl),d=all.filter(i=>p.done[i.id]).length;return{d,n:all.length,pc:Math.round(d*100/all.length)}}
-function route(){const[id,sub,bid,x,eid]=location.hash.slice(2).split('/');if(id==='preise'){if(!(Sync&&Sync.user&&$('#prQ')))preise();return}const p=st.projects.find(x=>x.id===id);
+function route(){const[id,sub,bid,x,eid]=location.hash.slice(2).split('/');if(id==='preise'){if(!(Sync&&Sync.user&&$('#prQ')))preise();return}if(id==='offene'){opView(null,main);return}const p=st.projects.find(x=>x.id===id);
   if(!p)return list();
   if(sub==='besuch'&&x==='e'){const f=$('#beForm');if(f&&f.dataset.h===location.hash)return;return beEntry(p,bid,eid,main)} // Formular nicht neu zeichnen (Eingaben bleiben)
-  beSubView=null;sub==='check'?detail(p):sub==='plan'?plan(p):sub==='besuche'?beList(p,main):sub==='besuch'?beVisit(p,bid,main):sub==='liste'&&glBySlug(bid)&&glFor(p).includes(glBySlug(bid))?glView(p,glBySlug(bid),main):hub(p)}
+  beSubView=null;sub==='check'?detail(p):sub==='plan'?plan(p):sub==='besuche'?beList(p,main):sub==='offene'?opView(p,main):sub==='besuch'?beVisit(p,bid,main):sub==='liste'&&glBySlug(bid)&&glFor(p).includes(glBySlug(bid))?glView(p,glBySlug(bid),main):hub(p)}
 function backTo(label,hash){const b=$('#back');b.textContent=label;b.style.visibility='visible';b.onclick=()=>{location.hash=hash}}
 function hub(p){
   $('#title').textContent=p.name;backTo('‹ Projekte','');const g=prog(p);
@@ -21,8 +21,9 @@ function hub(p){
   <a class="card tile" href="#/${p.id}/check"><span class="ti">☑︎</span><span class="tx"><b>Checkliste</b><span class="muted">${TEMPLATES[p.tpl].title}</span>
     <span class="muted">${g.d} von ${g.n} erledigt (${g.pc} %)</span><span class="bar"><i style="width:${g.pc}%"></i></span></span></a>
   <a class="card tile" href="#/${p.id}/plan"><span class="ti">📅</span><span class="tx"><b>Bauzeitenplan</b><span class="muted">${esc(bzpTeaser(p))}</span></span></a>
-  <a class="card tile" href="#/${p.id}/besuche"><span class="ti">📷</span><span class="tx"><b>Besuche</b><span class="muted" id="beTeaser">Besuchsprotokolle mit Fotos</span></span></a>${glTiles(p)}`;
-  beTeaser(p,$('#beTeaser'));
+  <a class="card tile" href="#/${p.id}/besuche"><span class="ti">📷</span><span class="tx"><b>Besuche</b><span class="muted" id="beTeaser">Besuchsprotokolle mit Fotos</span></span></a>
+  <a class="card tile" href="#/${p.id}/offene"><span class="ti">✅</span><span class="tx"><b>Offene Punkte</b><span class="muted" id="opTeaser">Abhakliste aus Besuchen, E-Mail und Telefon</span></span></a>${glTiles(p)}`;
+  beTeaser(p,$('#beTeaser'));opTeaser(p,$('#opTeaser'));
 }
 function preise(){$('#title').textContent='Preisdatenbank';backTo('‹ Projekte','');prView(main)}
 function plan(p){$('#title').textContent=p.name;backTo('‹ Übersicht','#/'+p.id);bzpView(p,main)}
@@ -34,8 +35,10 @@ function list(){
     <div class="muted">${p.addr?esc(p.addr)+' · ':''}${TEMPLATES[p.tpl].title}</div>
     <div class="muted">${g.d} von ${g.n} erledigt (${g.pc} %)</div><div class="bar"><i style="width:${g.pc}%"></i></div></a>
     <button class="del" data-del="${p.id}">Löschen</button></div>`}
+  h+=`<a class="card tile prtile" href="#/offene"><span class="ti">✅</span><span class="tx"><b>Offene Punkte</b><span class="muted" id="opTeaserAll">Alle Bauvorhaben</span></span><span class="chev">›</span></a>`;
   h+=`<a class="card tile prtile" href="#/preise"><span class="ti">💶</span><span class="tx"><b>Preisdatenbank</b><span class="muted">${esc(prTeaser())}</span></span><span class="chev">›</span></a>`;
   main.innerHTML=h+'<div class="tools bk"><button id="bkSave">Sichern</button><button id="bkLoad">Wiederherstellen</button></div><button class="fab" id="add">+ Neues Bauvorhaben</button>';
+  opTeaser(null,$('#opTeaserAll'));
   $('#bkSave').onclick=async()=>{const r=await shareOrDownload(makeBackup(st),backupName());if(r==='downloaded')alert('Die Sicherung wurde heruntergeladen.')};
   $('#bkLoad').onclick=()=>{$('#bkFile').value='';$('#bkFile').click()};
   $('#add').onclick=()=>{$('#newForm').reset();$('#dlg').showModal()};

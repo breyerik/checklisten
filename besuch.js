@@ -1,7 +1,7 @@
 // Besuchsprotokolle pro Bauvorhaben: Einträge mit Fotos, offline in IndexedDB, Upload nach Supabase,
 // PDF-Protokoll im Browser (jsPDF, liegt in vendor/). Jeder Nutzer sieht nur seine eigenen Besuche.
-const BE_ART={mangel:'Mangel',nachtrag:'Nachtrag',technik:'Technische Frage'};
-const BE_ARTS={mangel:'Mängel',nachtrag:'Nachträge',technik:'Technische Fragen'};
+const BE_ART={mangel:'Offener Punkt',nachtrag:'Nachtrag',technik:'Technische Frage'};
+const BE_ARTS={mangel:'Offene Punkte',nachtrag:'Nachträge',technik:'Technische Fragen'};
 const BE_ORDER=['mangel','nachtrag','technik'];
 const BE_VON={bauherr:'Bauherr',firma:'Firma',wir:'wir'};
 const BE_FIELDS=['art','gewerk','firma','stelle','beschreibung','frist','menge','einheit','angefordert_von','bauherr_zahlt','dringend','pos'];
@@ -81,13 +81,17 @@ if(typeof module!=='undefined')module.exports={beGroups,beFields,beFileName,beAn
 
 // ---------- Browser: lokale Datenbank (IndexedDB) ----------
 const BeDB=typeof window==='undefined'?null:(()=>{
-  let dbp;const S=['besuche','eintraege','fotos','tomb'];
-  const open=()=>dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open('bs-besuche',1);
-    r.onupgradeneeded=()=>{const d=r.result;
-      d.createObjectStore('besuche',{keyPath:'id'}).createIndex('uid','uid');
-      const e=d.createObjectStore('eintraege',{keyPath:'id'});e.createIndex('uid','uid');e.createIndex('besuch','besuch_id');
-      const f=d.createObjectStore('fotos',{keyPath:'id'});f.createIndex('uid','uid');f.createIndex('eintrag','eintrag_id');f.createIndex('besuch','besuch_id');
-      d.createObjectStore('tomb',{keyPath:'id'}).createIndex('uid','uid')};
+  let dbp;const S=['besuche','eintraege','fotos','tomb','punkte','pfotos'];
+  const open=()=>dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open('bs-besuche',2);
+    r.onupgradeneeded=()=>{const d=r.result,has=n=>d.objectStoreNames.contains(n);
+      if(!has('besuche')){
+        d.createObjectStore('besuche',{keyPath:'id'}).createIndex('uid','uid');
+        const e=d.createObjectStore('eintraege',{keyPath:'id'});e.createIndex('uid','uid');e.createIndex('besuch','besuch_id');
+        const f=d.createObjectStore('fotos',{keyPath:'id'});f.createIndex('uid','uid');f.createIndex('eintrag','eintrag_id');f.createIndex('besuch','besuch_id');
+        d.createObjectStore('tomb',{keyPath:'id'}).createIndex('uid','uid')}
+      // v2: Offene Punkte (Status-Zeilen zu Besuch-Punkten + selbst angelegte Punkte) mit Fotos
+      if(!has('punkte'))d.createObjectStore('punkte',{keyPath:'id'}).createIndex('uid','uid');
+      if(!has('pfotos')){const f=d.createObjectStore('pfotos',{keyPath:'id'});f.createIndex('uid','uid');f.createIndex('punkt','punkt_id')}};
     r.onsuccess=()=>res(r.result);r.onerror=()=>{dbp=null;rej(r.error)}}));
   const rq=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
   async function all(s,ix,key){const d=await open();return rq(d.transaction(s).objectStore(s).index(ix).getAll(key))}
@@ -100,21 +104,26 @@ const BeDB=typeof window==='undefined'?null:(()=>{
 
 // ---------- Browser: Abgleich mit Supabase ----------
 const BE=typeof window==='undefined'?null:(()=>{
-  let running=false,again=false,timer=null,state='idle',err='',lastClean=0;const subs=new Set();
+  let running=false,again=false,timer=null,state='idle',err='',lastClean=0,opMissing=false;const subs=new Set();
   const uid=()=>Sync&&Sync.user&&Sync.user.id;
   const emit=changed=>subs.forEach(f=>{try{f(changed)}catch(e){}});
   const off=e=>!navigator.onLine||e instanceof TypeError;
   async function pending(u,bid){u=u||uid();if(!u)return 0;
-    const[b,e,f,t]=await Promise.all(BeDB.S.map(s=>BeDB.all(s,'uid',u)));
+    const[b,e,f,t,pu,pf]=await Promise.all(BeDB.S.map(s=>BeDB.all(s,'uid',u)));
     const m=x=>!bid||x.besuch_id===bid;
-    return b.filter(x=>(!bid||x.id===bid)&&(x.dirty||x.wantFertig)).length+e.filter(x=>x.dirty&&m(x)).length+f.filter(x=>x.dirty&&m(x)).length+t.filter(m).length}
+    // Offene Punkte zählen nie für „Besuch abschließen“ (bid) und nicht, solange die Server-Tabellen fehlen
+    const op=bid||opMissing?0:pu.filter(x=>x.dirty).length+pf.filter(x=>x.dirty).length;
+    return b.filter(x=>(!bid||x.id===bid)&&(x.dirty||x.wantFertig)).length+e.filter(x=>x.dirty&&m(x)).length+f.filter(x=>x.dirty&&m(x)).length+t.filter(m).length+op}
   // nach erfolgreichem Upload: sauber markieren, wenn inzwischen nicht erneut geändert
   const clean=(s,id,rev,extra={})=>BeDB.tx(o=>{const r=o[s].get(id);r.onsuccess=()=>{const x=r.result;if(x&&x.rev===rev)o[s].put({...x,...extra,dirty:0,srv:1});else if(x)o[s].put({...x,srv:1})}});
   const pick=(x,ks)=>Object.fromEntries(ks.map(k=>[k,x[k]===undefined?null:x[k]]));
+  const OP_FIELDS=['gewerk','firma','stelle','beschreibung','frist'],OP_STATUS=['erledigt_am','rueckmeldung_am','notiz'];
   async function push(u){
     const api=Sync.api,P=pref=>({Prefer:pref});let fails=0;
     const tryIt=async f=>{try{await f()}catch(e){if(off(e)||!e.status||e.status===401)throw e;fails++;err=e.message}};
-    for(const t of await BeDB.all('tomb','uid',u))await tryIt(async()=>{
+    // Offene Punkte: fehlen die Server-Tabellen noch (SQL nicht eingespielt), bleibt alles lokal und stört den Rest nicht
+    const opTry=f=>tryIt(async()=>{try{await f()}catch(e){if(e.status===404){opMissing=true;return}throw e}});
+    for(const t of await BeDB.all('tomb','uid',u))await(t.table.startsWith('offene_punkte')?opTry:tryIt)(async()=>{
       await api(`/rest/v1/${t.table}?id=eq.${t.id}`,{method:'DELETE',headers:P('return=minimal')});await BeDB.tx(o=>o.tomb.delete(t.id))});
     const bs=await BeDB.all('besuche','uid',u),es=await BeDB.all('eintraege','uid',u),fs=await BeDB.all('fotos','uid',u);
     for(const b of bs.filter(x=>x.dirty))await tryIt(async()=>{
@@ -126,6 +135,22 @@ const BE=typeof window==='undefined'?null:(()=>{
     for(const f of fs.filter(x=>x.dirty&&x.data))await tryIt(async()=>{
       await api('/rest/v1/besuch_fotos?on_conflict=id',{method:'POST',headers:P('resolution=ignore-duplicates,return=minimal'),body:{...pick(f,['id','eintrag_id','pos','data']),user_id:u}});
       await clean('fotos',f.id,f.rev)});
+    // Offene Punkte (nach den Einträgen, damit der Server-Trigger die Besuch-Punkte schon angelegt hat)
+    const ps=await BeDB.all('punkte','uid',u),pfs=await BeDB.all('pfotos','uid',u),eids=new Set(es.map(e=>e.id));
+    for(const x of ps.filter(x=>x.dirty))await opTry(async()=>{
+      if(x.quelle==='besuch'){
+        if(!eids.has(x.id)){await BeDB.tx(o=>o.punkte.delete(x.id));return}   // Eintrag wurde gelöscht
+        const r=await api(`/rest/v1/offene_punkte?id=eq.${x.id}`,{method:'PATCH',headers:P('return=representation'),body:pick(x,OP_STATUS)});
+        if(r&&r[0])await clean('punkte',x.id,x.rev);          // sonst kennt der Server den Eintrag noch nicht: später erneut
+      }else{
+        await api('/rest/v1/offene_punkte?on_conflict=id',{method:'POST',headers:P('resolution=merge-duplicates,return=minimal'),body:{...pick(x,['id','projekt_id','bv','quelle','angelegt_am',...OP_FIELDS,...OP_STATUS]),user_id:u}});
+        await clean('punkte',x.id,x.rev)}});
+    const pm=new Map((await BeDB.all('punkte','uid',u)).map(x=>[x.id,x]));
+    for(const f of pfs.filter(x=>x.dirty&&x.data))await opTry(async()=>{
+      const pk=pm.get(f.punkt_id);if(!pk){await BeDB.tx(o=>o.pfotos.delete(f.id));return}
+      if(!pk.srv)return;   // Punkt selbst ist noch nicht hochgeladen (Fehler oben): später
+      await api('/rest/v1/offene_punkte_fotos?on_conflict=id',{method:'POST',headers:P('resolution=ignore-duplicates,return=minimal'),body:{...pick(f,['id','punkt_id','pos','data']),user_id:u}});
+      await clean('pfotos',f.id,f.rev)});
     // „Fertig“ erst, wenn zu diesem Besuch nichts mehr aussteht
     for(const b of (await BeDB.all('besuche','uid',u)).filter(x=>x.wantFertig&&!x.dirty))if(await pending(u,b.id)===1)await tryIt(async()=>{
       const r=await api(`/rest/v1/besuche?id=eq.${b.id}`,{method:'PATCH',headers:P('return=representation'),body:{status:'fertig'}});
@@ -154,6 +179,23 @@ const BE=typeof window==='undefined'?null:(()=>{
         sync('fotos',lf,fs,(l,r)=>!l?{...r,besuch_id:eb.get(r.eintrag_id),uid:u,data:null,dirty:0,rev:0,srv:1}:l.dirty?null:{...l,pos:r.pos,srv:1});
       }))));return()=>changed}).then(f=>f());
   }
+  // Offene Punkte vom Server übernehmen (eigene Funktion: fehlende Tabellen dürfen den Besuchs-Abgleich nicht stören)
+  async function pullPunkte(u){
+    const api=Sync.api;let ps,fs;
+    try{[ps,fs]=await Promise.all([api(`/rest/v1/offene_punkte?select=*&user_id=eq.${u}`),api(`/rest/v1/offene_punkte_fotos?select=id,punkt_id,pos&user_id=eq.${u}`)])}
+    catch(e){if(e.status===404){opMissing=true;return false}throw e}
+    opMissing=false;
+    return BeDB.tx(o=>{let changed=false;const ix=(s,cb)=>{const r=o[s].index('uid').getAll(u);r.onsuccess=()=>cb(r.result)};
+      ix('punkte',lp=>ix('pfotos',lf=>ix('tomb',lt=>{const gone=new Set(lt.map(t=>t.id));
+        const sync=(store,local,remote,merge)=>{const lm=new Map(local.map(x=>[x.id,x])),rs=new Set();
+          for(const r of remote){rs.add(r.id);if(gone.has(r.id))continue;const l=lm.get(r.id),n=merge(l,r);
+            if(n&&JSON.stringify(n)!==JSON.stringify(l)){o[store].put(n);changed=true}}
+          for(const l of local)if(l.srv&&!l.dirty&&!rs.has(l.id)){o[store].delete(l.id);changed=true}};
+        // Besuch-Punkte: Text vom Server, Status bleibt lokal, solange er noch nicht hochgeladen ist
+        sync('punkte',lp,ps,(l,r)=>!l?{...r,uid:u,dirty:0,rev:0,srv:1}:!l.dirty?{...l,...r,srv:1}:l.quelle==='besuch'?{...l,...r,...pick(l,OP_STATUS),erledigt_von:l.erledigt_von,srv:1}:null);
+        sync('pfotos',lf,fs,(l,r)=>!l?{...r,uid:u,data:null,dirty:0,rev:0,srv:1}:l.dirty?null:{...l,pos:r.pos,srv:1});
+      })));return()=>changed}).then(f=>f());
+  }
   async function run(){
     const u=uid();if(!u||!BeDB)return;if(running){again=true;return}running=true;let changed=false;
     try{
@@ -161,7 +203,7 @@ const BE=typeof window==='undefined'?null:(()=>{
       set('busy');const before=await pending(u);
       const fails=await push(u);
       if(Date.now()-lastClean>30*60000){lastClean=Date.now();try{await Sync.api('/rest/v1/rpc/besuch_fotos_aufraeumen',{method:'POST',body:{}})}catch(e){if(off(e))throw e}}
-      changed=await pull(u)||before!==await pending(u);
+      changed=await pull(u);try{changed=await pullPunkte(u)||changed}catch(e){if(off(e))throw e}changed=changed||before!==await pending(u);
       set(fails?'err':'ok',fails?err:'');
     }catch(e){if(off(e))set('offline');else set('err',e.message)}
     finally{running=false;emit(changed);if(again){again=false;kick(50)}}
@@ -175,12 +217,19 @@ const BE=typeof window==='undefined'?null:(()=>{
       await BeDB.tx(o=>{for(const r of rows){const q=o.fotos.get(r.id);q.onsuccess=()=>q.result&&o.fotos.put({...q.result,data:r.data})}});
       for(const r of rows){const f=list.find(x=>x.id===r.id);if(f)f.data=r.data}}
     return list}
+  // Fotos selbst angelegter Punkte nachladen (auf dem anderen Gerät aufgenommen)
+  async function ensurePfotos(list){const miss=list.filter(f=>!f.data&&f.srv);if(!miss.length||!navigator.onLine||!uid())return list;
+    for(let i=0;i<miss.length;i+=8){const ids=miss.slice(i,i+8).map(f=>f.id);let rows;
+      try{rows=await Sync.api(`/rest/v1/offene_punkte_fotos?select=id,data&id=in.(${ids.join(',')})`)}catch(e){break}
+      await BeDB.tx(o=>{for(const r of rows){const q=o.pfotos.get(r.id);q.onsuccess=()=>q.result&&o.pfotos.put({...q.result,data:r.data})}});
+      for(const r of rows){const f=list.find(x=>x.id===r.id);if(f)f.data=r.data}}
+    return list}
   if(typeof window!=='undefined'){
     addEventListener('online',()=>kick(200));addEventListener('offline',()=>set('offline'));
     document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')kick(300)});
     setInterval(async()=>{if(document.visibilityState==='visible'&&navigator.onLine&&uid()&&await pending())run()},30000);
   }
-  return{run,kick,pending,ensureFotos,on:f=>subs.add(f),off:f=>subs.delete(f),get state(){return state},get err(){return err}};
+  return{run,kick,pending,ensureFotos,ensurePfotos,get opMissing(){return opMissing},on:f=>subs.add(f),off:f=>subs.delete(f),get state(){return state},get err(){return err}};
 })();
 
 // ---------- Browser: Ansichten ----------
@@ -236,7 +285,7 @@ async function beVisit(p,bid,el){
       ${v.fotos_geloescht_at?`<div class="muted">Fotos wurden am ${beDT(v.fotos_geloescht_at)} gelöscht, das PDF enthält nur noch die Texte.</div>`:''}</div>
       <div id="beStat" class="bestat"></div>`;
     if(open)x+=`<div class="row" style="margin:0 0 10px"><button class="pri" id="beAdd">+ Eintrag</button></div>`;
-    if(!es.length)x+=`<div class="empty">${open?'Noch keine Einträge.<br>Tippe auf „+ Eintrag“ für einen Mangel, Nachtrag oder eine technische Frage.':'Keine Einträge.'}</div>`;
+    if(!es.length)x+=`<div class="empty">${open?'Noch keine Einträge.<br>Tippe auf „+ Eintrag“ für einen offenen Punkt, Nachtrag oder eine technische Frage.':'Keine Einträge.'}</div>`;
     for(const g of beGroups(es.slice())){x+=`<div class="beg">${g.title}</div>`;
       for(const f of g.firmen)for(const e of f.entries){const ps=fs.filter(q=>q.eintrag_id===e.id).sort((a,b)=>a.pos-b.pos);
         const meta=beFields(e).filter(([k])=>!['Art','Gewerk','Firma'].includes(k)).map(([k,val])=>`${k}: ${beE(val)}`).join(' · ');
