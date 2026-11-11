@@ -695,6 +695,12 @@ const TEMPLATES = {
       "id": "ohne-7-5"
      },
      {
+      "text": "Nach Verlegen der Leerrohre (Hausanschluss): Dichtigkeit der Einführungen im HTR herstellen lassen",
+      "sub": false,
+      "header": false,
+      "id": "ohne-7-25"
+     },
+     {
       "text": "nach Fenstermontage:",
       "sub": false,
       "header": true,
@@ -1911,6 +1917,12 @@ const TEMPLATES = {
       "sub": false,
       "header": false,
       "id": "mit-8-5"
+     },
+     {
+      "text": "Nach Verlegen der Leerrohre (Hausanschluss): Dichtigkeit der Einführungen im HTR herstellen lassen",
+      "sub": false,
+      "header": false,
+      "id": "mit-8-24"
      },
      {
       "text": "nach Fenstermontage:",
