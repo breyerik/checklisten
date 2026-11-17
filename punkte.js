@@ -219,13 +219,14 @@ function opPdf(J,rows,grp,meta){
     if(x.frist)f.push(['Frist',beDate(x.frist)]);if(x.rueckmeldung_am)f.push(['Rückmeldung','Firma meldet erledigt am '+beDate(x.rueckmeldung_am)]);
     if(x.notiz)f.push(['Notiz',x.notiz]);return f};
   const status=x=>opIsDone(x)?['erledigt '+beDate(x.erledigt_am),[47,125,79]]:x.frist&&x.frist<beToday()?['überfällig',[196,56,44]]:['offen',[11,107,203]];
-  const TH=24;let nr=0,cur=null;
+  let nr=0,cur=null;
   for(const x of rows){nr++;
     const title=`${nr}. ${[x.gewerk,x.firma].filter(Boolean).join(' · ')||'–'}`,[stt,stc]=status(x);
     doc.setFont('helvetica','bold');doc.setFontSize(9);const sw=doc.getTextWidth(A(stt))+5;
     const tl=lines(title,11,true,CW-sw-6),bl=x.beschreibung?lines(x.beschreibung,10.5,false,CW-4):[];
-    const fl=fields(x).map(([k,v])=>[k,lines(v,9.5,false,CW-30)]);const fotos=(x.fotos||[]).filter(f=>f.data).slice(0,3);
-    const est=tl.length*5+bl.length*4.7+fl.reduce((s,[,l])=>s+l.length*4.2,0)+(fotos.length?TH+3:0)+7;
+    const fl=fields(x).map(([k,v])=>[k,lines(v,9.5,false,CW-30)]);const fotos=(meta.fotos&&meta.fotos[x.id])||[];
+    const PW=(CW-6)/2,PMAX=95,ph=f=>f.data?Math.min(PMAX,PW*f.h/f.w):9;
+    const est=tl.length*5+bl.length*4.7+fl.reduce((s,[,l])=>s+l.length*4.2,0)+(fotos.length?Math.max(ph(fotos[0]),fotos[1]?ph(fotos[1]):0)+4:0)+7;
     if(grp){const g=grp(x);if(g!==cur){cur=g;need(12+Math.min(est,60));const n=rows.filter(r=>grp(r)===g).length;
       doc.setFillColor(241,241,239);doc.roundedRect(M,y,CW,8.5,1.5,1.5,'F');doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...INK);
       doc.text(A(g),M+3,y+5.9);doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(...GREY);doc.text(`${n} ${n===1?'Punkt':'Punkte'}`,W-M-3,y+5.9,{align:'right'});y+=12}}
@@ -234,17 +235,51 @@ function opPdf(J,rows,grp,meta){
     doc.setFillColor(...stc.map(c=>Math.round(c+(255-c)*0.86)));doc.roundedRect(W-M-sw,y0+0.3,sw,5,1.2,1.2,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(...stc);doc.text(A(stt),W-M-sw/2,y0+3.8,{align:'center'});
     if(bl.length){y+=0.5;for(const l of bl){need(4.7);put([l],M+1,10.5,false,INK,4.7)}}
     y+=0.8;for(const[k,ls]of fl){ls.forEach((l,i)=>{need(4.2);if(!i){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(...GREY);doc.text(A(k),M+1,y+3.4)}put([l],M+30,9.5,false,INK,4.2)})}
-    if(fotos.length){need(TH+3);let fx=M+1;for(const f of fotos){try{const src='data:image/jpeg;base64,'+f.data,pr=doc.getImageProperties(src),s=TH/pr.height,w=Math.min(pr.width*s,45);
-      doc.addImage(src,'JPEG',fx,y+1,w,TH,f.id||undefined,'FAST');fx+=w+2}catch(e){}}y+=TH+3}
+    // Fotos: alle, 2 je Reihe (~87 mm breit), Seitenumbruch je Reihe; fehlgeschlagene als sichtbarer Hinweis
+    if(fotos.length){y+=1.5;for(let i=0;i<fotos.length;i+=2){const pr=fotos.slice(i,i+2),rh=Math.max(...pr.map(ph));need(rh+3);
+      pr.forEach((f,j)=>{const fx=M+1+j*(PW+4);
+        if(f.data){const h=ph(f),w=Math.min(PW,h*f.w/f.h);try{doc.addImage('data:image/jpeg;base64,'+f.data,'JPEG',fx,y,w,h,'op_'+f.id,'NONE');return}catch(e){}}
+        doc.setFillColor(251,231,228);doc.roundedRect(fx,y,PW,9,1.2,1.2,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(196,56,44);
+        doc.text(A('Foto konnte nicht geladen werden'+(f.why?' ('+f.why+')':'')),fx+3,y+5.8)});
+      y+=rh+3}}
     y+=1.5;doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,y,W-M,y);y+=3.5}
   const pages=doc.getNumberOfPages();
   for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,120,120);
     doc.text(A(`Offene Punkte · ${meta.titel} · ${meta.stand}`),M,H-8);doc.text(`Seite ${i} von ${pages}`,W-M,H-8,{align:'right'})}
   return doc}
 const opPdfName=t=>`Offene-Punkte_${String(t).replace(/[^\wäöüÄÖÜß-]+/g,'_').replace(/^_+|_+$/g,'')||'Liste'}_${beToday()}.pdf`;
+// Fotos für den PDF-Export sammeln: selbst angelegte Punkte -> IndexedDB „pfotos“ (Cloud: offene_punkte_fotos.data),
+// Punkte aus Besuchen -> IndexedDB „fotos“ je Eintrag (Cloud: besuch_fotos.data). Fehlende Bilddaten werden aus der Cloud nachgeladen
+// (nur lesen, wie beim Anzeigen), danach jedes Foto neu als JPEG gerendert (EXIF-Drehung durch den Browser, max. 1400 px, Qualität 0,75).
+const miss0=a=>a.filter(f=>!f.data).length;
+async function opPdfFotos(rows,prog){
+  const lists={};let all=[];
+  for(const x of rows){let fs;if(x.manual)fs=(x.fotos||[]).map(f=>({...f,_t:'p'}));
+    else{fs=(await BeDB.all('fotos','eintrag',x.id)).sort((a,b)=>(a.pos||0)-(b.pos||0)).map(f=>({...f,_t:'b'}))}
+    lists[x.id]=fs;all=all.concat(fs)}
+  const n=all.length;let done=0;prog&&prog(n-miss0(all),n,'geladen');if(!n)return{};
+  const miss=all.filter(f=>!f.data);
+  for(let i=0;i<miss.length;i+=8){const ch=miss.slice(i,i+8);
+    try{const pp=ch.filter(f=>f._t==='p'),bb=ch.filter(f=>f._t==='b');if(pp.length)await BE.ensurePfotos(pp);if(bb.length)await BE.ensureFotos(bb)}catch(e){}
+    prog&&prog(n-miss.length+Math.min(i+8,miss.length),n,'geladen')}
+  const out={};
+  for(const[id,fs]of Object.entries(lists)){out[id]=[];
+    for(const f of fs){let r;
+      if(!f.data)r={id:f.id,why:navigator.onLine?'nicht in der Cloud gefunden':'offline'};
+      else{try{r={id:f.id,...await opPdfImg(f.data)}}catch(e){r={id:f.id,why:'Bild nicht lesbar'}}}
+      out[id].push(r);prog&&prog(++done,n,'eingefügt')}}
+  return out}
+function opPdfImg(b64,max=1400,q=0.75){
+  const raw=String(b64).replace(/^data:[^,]*,/,''),mime=raw.startsWith('/9j/')?'image/jpeg':raw.startsWith('iVBOR')?'image/png':raw.startsWith('R0lG')?'image/gif':raw.startsWith('UklG')?'image/webp':'image/jpeg';
+  return new Promise((res,rej)=>{const i=new Image();i.onerror=()=>rej(new Error('Bild nicht lesbar'));
+    i.onload=()=>{try{const s=Math.min(1,max/Math.max(i.naturalWidth,i.naturalHeight)),w=Math.max(1,Math.round(i.naturalWidth*s)),h=Math.max(1,Math.round(i.naturalHeight*s));
+      const c=document.createElement('canvas');c.width=w;c.height=h;const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,w,h);g.drawImage(i,0,0,w,h);
+      const d=c.toDataURL('image/jpeg',q);c.width=c.height=0;res({data:d.slice(d.indexOf(',')+1),w,h})}catch(e){rej(e)}};
+    i.src=`data:${mime};base64,${raw}`})}
 async function opSharePdf(rows,grp,meta,btn){
   const t=btn.textContent;btn.disabled=true;btn.textContent='PDF wird erstellt …';let blob;const name=opPdfName(meta.titel);
-  try{const J=await beLoadPdf();blob=opPdf(J,rows,grp,meta).output('blob')}
+  try{const J=await beLoadPdf();meta.fotos=await opPdfFotos(rows,(i,n,w)=>{btn.textContent=`Fotos werden ${w} … ${i}/${n}`});
+    btn.textContent='PDF wird erstellt …';await new Promise(r=>setTimeout(r,30));blob=opPdf(J,rows,grp,meta).output('blob')}
   catch(e){alert('Das PDF konnte nicht erstellt werden: '+e.message);return}
   finally{btn.disabled=false;btn.textContent=t}
   window._opLastPdf={name,blob};
