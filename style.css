@@ -97,3 +97,105 @@ fieldset{border:1px solid #ddd;border-radius:10px}.radio{display:flex!important;
 .chip.haus{font-size:12px;padding:1px 6px;border-radius:6px;background:#1f4e79;border-color:#1f4e79;color:#fff;font-weight:600}
 .beform .lbl{font-size:13px;color:#555;margin:2px 0 4px}.seg.haus span{padding:9px 2px}
 .opf.ophn{margin-top:14px}.opf.ophn label{flex:1;display:flex;align-items:center;gap:8px;font-size:14px;color:#555}.opf.ophn select{flex:0 0 96px}
+
+/* ================================================================
+   UI-Redesign „ruhig & aufgeräumt“ (Notion / Things / Todoist-Stil)
+   Nur Optik: überschreibt die Regeln oben, keine Funktionsänderung.
+   ================================================================ */
+:root{--ink:#191919;--ink2:#5f5e5b;--line:#e6e5e2;--line2:#d9d8d4;--bg:#f7f7f5;--paper:#fff;--hover:#f1f1ef;
+  --acc:#0b6bcb;--accbg:#e7f1fb;--ok:#2f7d4f;--okbg:#e3f1e8;--warn:#8a5a00;--warnbg:#fbf0d9;--bad:#c4382c;--badbg:#fbe7e4}
+body{background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+/* Kopfzeile: weiß, Zurück-Link oben, großer Seitentitel darunter (wie eine Notion-Seite) */
+#bar{flex-wrap:wrap;background:rgba(255,255,255,.96);-webkit-backdrop-filter:saturate(180%) blur(12px);backdrop-filter:saturate(180%) blur(12px);color:var(--ink);border-bottom:1px solid var(--line);
+  padding:calc(env(safe-area-inset-top) + 4px) calc(env(safe-area-inset-right) + 16px) 10px calc(env(safe-area-inset-left) + 12px)}
+#bar h1{order:2;flex:0 0 100%;text-align:left;font-size:26px;font-weight:700;letter-spacing:-.02em;padding:0 4px;line-height:1.2}
+.hdrbtn{color:var(--ink2);font-size:16px;font-weight:500;min-height:44px;padding:10px 6px}
+.hdrbtn.sp{display:none}
+#back[style*="hidden"]{display:none}
+main{padding-top:14px}
+.sync{background:var(--paper);color:var(--ink2);border-bottom:1px solid var(--line);font-size:13px}
+.sync.offline,.sync.pending{background:var(--warnbg);color:var(--warn)}.sync.err,.sync.relogin{background:var(--badbg);color:var(--bad)}
+.muted{color:var(--ink2)}
+/* Karten: flach, feine Linie statt Schatten */
+.card{border:1px solid var(--line);box-shadow:none;border-radius:10px}
+a.card:active,.opb:active,.item:active{background:var(--hover)}
+.sech{margin:18px 4px 6px;font-size:13px;font-weight:600;color:var(--ink2);letter-spacing:.02em}
+.sech:first-child{margin-top:2px}
+/* Projekte */
+.proj{padding:12px 12px 12px 14px}
+.proj b{font-size:17px;font-weight:600}
+.pgi{flex:none;width:40px;height:40px;border-radius:8px;background:var(--hover);display:flex;align-items:center;justify-content:center;font-size:21px}
+.del{background:none;color:var(--ink2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px;min-height:44px}
+.bar{height:6px;background:#ecebe8;border-radius:3px;margin-top:8px}.bar i{background:var(--ok);border-radius:3px}
+/* Kacheln (Hub & Startseite) als ruhige Listenzeilen mit Icon-Feld */
+.tile{padding:14px 14px;gap:14px;min-height:64px}
+.tile .ti{flex:none;width:42px;height:42px;border-radius:9px;background:var(--hover);display:flex;align-items:center;justify-content:center;font-size:22px}
+.tile b{font-size:17px;font-weight:600}
+.tile:after{content:"›";font-size:24px;color:#b5b4b0;margin-left:auto;padding-left:4px}
+.prtile{margin-top:8px;background:var(--paper);border:1px solid var(--line)}
+.prtile .chev{display:none}
+.hubaddr{margin:0 4px 12px;font-size:15px}
+.bev .chev{color:#b5b4b0}
+/* Buttons */
+.row button,.tools button{min-height:48px;border-radius:9px;font-weight:600}
+.pri{background:var(--ink);color:#fff}
+.sec{background:var(--paper);color:var(--ink);border:1px solid var(--line2)!important}
+.row .fertig{background:var(--ok)}
+.tools button{background:var(--paper);color:var(--ink);border:1px solid var(--line);font-size:15px}
+.fab{background:var(--ink);border-radius:14px;padding:16px 22px;font-weight:600;box-shadow:0 6px 20px rgba(15,15,15,.22)}
+/* Checkliste: Abschnitte als Notion-Toggles, Häkchen wie Aufgaben */
+details.sec{border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+details.sec summary{min-height:52px;align-items:center;padding:12px 14px 12px 12px;font-weight:600;cursor:pointer}
+details.sec summary>span:first-child{display:flex;gap:8px;align-items:center}
+details.sec summary>span:first-child:before{content:"";flex:none;width:0;height:0;border-left:6px solid #8f8e8a;border-top:5px solid transparent;border-bottom:5px solid transparent;transition:transform .15s;margin:0 6px 0 4px}
+details.sec[open] summary>span:first-child:before{transform:rotate(90deg)}
+details.sec summary .muted{font-size:13px;background:var(--hover);border-radius:10px;padding:2px 9px}
+.done-sec summary{color:var(--ok)}.done-sec summary .muted{background:var(--okbg);color:var(--ok)}
+.item{border-top:1px solid #f0efed;padding:13px 14px 13px 16px;min-height:52px;align-items:center}
+.item.sub{padding-left:50px}
+.item input,.opck{border:2px solid #a3a29e;border-radius:6px;width:28px;height:28px}
+.item input:checked,.opck:checked{background-color:var(--acc);border-color:var(--acc)}
+.item.checked span{color:#9b9a97}
+.grp{border-top:1px solid #f0efed;color:var(--ink2);font-size:13px;letter-spacing:.02em;padding:14px 16px 4px}
+/* Eingaben */
+.prf,.opf{gap:8px}.prf{background:var(--bg)}
+.prf input,.prf select,.opf input,.opf select,.beform input:not([type=radio]):not([type=checkbox]):not([type=file]),.beform select,.beform textarea,dialog input:not([type=radio]){
+  border:1px solid var(--line2);border-radius:8px;background:var(--paper);color:var(--ink);min-height:46px}
+.opf select,.prf select{background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235f5e5b' stroke-width='1.6' fill='none'/%3E%3C/svg%3E") right 10px center/11px no-repeat;padding-right:26px}
+input:focus,select:focus,textarea:focus{outline:2px solid #9cc3ec;outline-offset:0;border-color:var(--acc)!important}
+.beform label,dialog label{color:var(--ink2);font-size:14px;font-weight:500}
+.beform .lbl{color:var(--ink2);font-size:14px;font-weight:500}
+fieldset{border-color:var(--line)}
+/* Segment-Umschalter: ruhig grau, aktive Option weiß */
+.seg{background:#ecebe8;border-radius:10px;padding:3px}
+.seg span{color:var(--ink2);border-radius:8px;min-height:42px;display:flex!important;align-items:center;justify-content:center;font-weight:500}
+.seg input:checked+span{color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(15,15,15,.12),0 0 0 1px rgba(15,15,15,.04)}
+/* Chips im Notion-Tag-Stil: flach, gedeckte Farbflächen */
+.chip{border:0;border-radius:5px;padding:2px 7px;font-size:12px;font-weight:500;background:var(--hover);color:var(--ink2)}
+.chip.st{border-radius:5px}.chip.st.offen{background:var(--accbg);color:#0a4f96}.chip.st.wartet{background:var(--warnbg);color:var(--warn)}.chip.st.fertig{background:var(--okbg);color:var(--ok)}
+.chip.art.mangel{background:var(--badbg);color:#a12c22}.chip.art.nachtrag{background:var(--warnbg);color:var(--warn)}.chip.art.technik{background:var(--accbg);color:#0a4f96}
+.chip.art.qbesuch{background:#ecebe8;color:#37352f}.chip.art.qemail{background:#efe7f8;color:#5b3a8f}.chip.art.qtelefon{background:var(--warnbg);color:var(--warn)}.chip.art.qsonstiges{background:var(--hover);color:var(--ink2)}
+.chip.haus{background:var(--ink);color:#fff;border-radius:5px;font-weight:600}
+.chip.fr{background:var(--hover);color:var(--ink2)}.chip.fr.late{background:var(--badbg);color:var(--bad)}
+.chip.rm{background:var(--warnbg);color:var(--warn)}
+.bzr .chip{background:none;border:1px solid}
+/* Offene Punkte & Besuchseinträge */
+.op{padding:14px 14px;gap:14px}
+.opb b,.beet b{font-weight:600}
+.bee{border-left-width:4px;border-radius:10px}
+.beg{color:var(--ink2);font-size:13px;font-weight:600;letter-spacing:.02em;margin:20px 4px 8px}
+.bestat{border-radius:8px}.bestat.ok{background:var(--okbg);color:var(--ok)}.bestat.wait{background:var(--warnbg);color:var(--warn)}.bestat.err{background:var(--badbg);color:var(--bad)}
+.opd{color:var(--ok)}
+.addfoto{background:var(--paper);border:1.5px dashed var(--line2);color:var(--ink)!important;border-radius:10px;min-height:52px}
+.optoast{background:#2f2f2d;border-radius:10px}
+.pick{border-color:var(--line);border-radius:8px}.pick.cur{border-color:var(--ink);background:var(--hover)}
+.bzf{color:var(--ink);font-size:14px}.bzr.next{background:var(--warnbg)}
+.prp{color:var(--ink)}
+/* Dialoge wie Notion-Modals */
+dialog{border-radius:12px;box-shadow:0 12px 40px rgba(15,15,15,.25);color:var(--ink);padding:20px}
+dialog::backdrop{background:rgba(15,15,15,.45)}
+dialog h2{font-size:22px;letter-spacing:-.01em}
+dialog a{color:var(--acc)}
+.empty{color:var(--ink2)}
+.prf{top:calc(env(safe-area-inset-top) + 100px)}
+.opf select{font-size:15px;padding-left:10px;padding-right:24px;background-position:right 8px center}

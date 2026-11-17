@@ -29,13 +29,13 @@ function preise(){$('#title').textContent='Preisdatenbank';backTo('‹ Projekte'
 function plan(p){$('#title').textContent=p.name;backTo('‹ Übersicht','#/'+p.id);bzpView(p,main)}
 function list(){
   $('#title').textContent='Bauleitung';$('#back').style.visibility='hidden';
-  let h=st.projects.length?'':'<div class="empty">Noch kein Bauvorhaben angelegt.<br>Tippe auf „+ Neues Bauvorhaben“.</div>';
+  let h=st.projects.length?'<div class="sech">Bauvorhaben</div>':'<div class="empty">Noch kein Bauvorhaben angelegt.<br>Tippe auf „+ Neues Bauvorhaben“.</div>';
   for(const p of st.projects){const g=prog(p);
-    h+=`<div class="card proj"><a class="info" href="#/${p.id}" style="color:inherit;text-decoration:none"><b>${esc(p.name)}</b>
+    h+=`<div class="card proj"><span class="pgi">🏗️</span><a class="info" href="#/${p.id}" style="color:inherit;text-decoration:none"><b>${esc(p.name)}</b>
     <div class="muted">${p.addr?esc(p.addr)+' · ':''}${TEMPLATES[p.tpl].title}</div>
     <div class="muted">${g.d} von ${g.n} erledigt (${g.pc} %)</div><div class="bar"><i style="width:${g.pc}%"></i></div></a>
     <button class="del" data-del="${p.id}">Löschen</button></div>`}
-  h+=`<a class="card tile prtile" href="#/offene"><span class="ti">✅</span><span class="tx"><b>Offene Punkte</b><span class="muted" id="opTeaserAll">Alle Bauvorhaben</span></span><span class="chev">›</span></a>`;
+  h+=`<div class="sech">Übergreifend</div><a class="card tile prtile" href="#/offene"><span class="ti">✅</span><span class="tx"><b>Offene Punkte</b><span class="muted" id="opTeaserAll">Alle Bauvorhaben</span></span><span class="chev">›</span></a>`;
   h+=`<a class="card tile prtile" href="#/preise"><span class="ti">💶</span><span class="tx"><b>Preisdatenbank</b><span class="muted">${esc(prTeaser())}</span></span><span class="chev">›</span></a>`;
   main.innerHTML=h+'<div class="tools bk"><button id="bkSave">Sichern</button><button id="bkLoad">Wiederherstellen</button></div><button class="fab" id="add">+ Neues Bauvorhaben</button>';
   opTeaser(null,$('#opTeaserAll'));
