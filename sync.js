@@ -17,13 +17,19 @@ function migrateState(st){
   return{...st,projects,schema:Math.max(+st.schema||0,SCHEMA)};
 }
 const ts=p=>Math.max(p.mod||0,p.created||0);
+// Haus-Zuordnung der offenen Punkte je Bauvorhaben: haus[punktId]={h:Hausnummer (0 = ohne),t:Zeitstempel}; neuester Eintrag gewinnt
+function mergeHaus(a,b){a=a&&typeof a==='object'?a:{};b=b&&typeof b==='object'?b:{};const out={};
+  for(const k of new Set([...Object.keys(a),...Object.keys(b)])){const x=a[k],y=b[k];out[k]=!x?y:!y?x:(+y.t||0)>(+x.t||0)?y:x}
+  return out}
 function mergeProject(l,r){
   const done={},undone={},ids=new Set([l.done,r.done,l.undone,r.undone].flatMap(o=>Object.keys(o||{})));
   for(const id of ids){
     const d=Math.max(+(l.done||{})[id]||0,+(r.done||{})[id]||0),u=Math.max(+(l.undone||{})[id]||0,+(r.undone||{})[id]||0);
     if(d&&d>=u)done[id]=d;else if(u)undone[id]=u;}
-  const n=ts(r)>ts(l)?r:l;
-  return{...r,...l,name:n.name,addr:n.addr,tpl:n.tpl,bzpSheet:n.bzpSheet,created:Math.min(l.created||Infinity,r.created||Infinity)===Infinity?undefined:Math.min(l.created||Infinity,r.created||Infinity),
+  const n=ts(r)>ts(l)?r:l,haus=mergeHaus(l.haus,r.haus),extra={};
+  if(Object.keys(haus).length)extra.haus=haus;
+  const hn=n.haeuser!=null?n.haeuser:(l.haeuser!=null?l.haeuser:r.haeuser);if(hn!=null)extra.haeuser=hn;
+  return{...r,...l,...extra,name:n.name,addr:n.addr,tpl:n.tpl,bzpSheet:n.bzpSheet,created:Math.min(l.created||Infinity,r.created||Infinity)===Infinity?undefined:Math.min(l.created||Infinity,r.created||Infinity),
     mod:Math.max(l.mod||0,r.mod||0)||undefined,done,undone,open:l.open||{}};
 }
 // local = Gerätestand, remote = Cloud-Stand. UI-Zustand (open) bleibt lokal.
@@ -44,7 +50,7 @@ function canon(s){
   return sort({...s,projects:(s.projects||[]).map(({open,...p})=>p)});
 }
 const same=(a,b)=>JSON.stringify(canon(a||{projects:[]}))===JSON.stringify(canon(b||{projects:[]}));
-if(typeof module!=='undefined')module.exports={mergeStates,mergeProject,canon,same,migrateState,SCHEMA};
+if(typeof module!=='undefined')module.exports={mergeStates,mergeProject,mergeHaus,canon,same,migrateState,SCHEMA};
 
 // ---------- Client (nur im Browser) ----------
 const Sync=typeof window==='undefined'?null:(()=>{

@@ -361,6 +361,8 @@ async function beEntry(p,bid,eid,el){
   const firmen=uniq([...planF,...allE.filter(e=>bvIds.has(e.besuch_id)).map(e=>e.firma)]);
   const gewerke=uniq([...prG,...allE.map(e=>e.gewerk)]);
   const art=old?old.art:(siblings.slice().sort((a,b)=>b.pos-a.pos)[0]||{}).art||'mangel';
+  const hn=opHausN(p),lastE=siblings.slice().sort((a,b)=>b.pos-a.pos)[0];
+  const h0=hn?(old?opHausOf({id:old.id,stelle:old.stelle},p):lastE?opHausOf({id:lastE.id,stelle:lastE.stelle},p):0):0;
   const opt=(o,cur)=>Object.entries(o).map(([k,l])=>`<option value="${k}"${k===cur?' selected':''}>${l}</option>`).join('');
   el.innerHTML=`<form id="beForm" class="beform" novalidate>
     <div class="seg">${BE_ORDER.map(a=>`<label><input type="radio" name="art" value="${a}"${a===art?' checked':''}><span>${BE_ART[a]}</span></label>`).join('')}</div>
@@ -369,7 +371,7 @@ async function beEntry(p,bid,eid,el){
     <label>Firma${planF.length?' <span class="muted">(Vorschläge aus dem Bauzeitenplan)</span>':''}<input name="firma" list="beFi" autocomplete="off"></label>
     <label>Stelle<input name="stelle" autocomplete="off" placeholder="Haus, Geschoss, Raum oder Bauteil"></label>
     <label><span id="beBl">Beschreibung</span><textarea name="beschreibung" rows="4" placeholder="Tippen oder über das Mikrofon der Tastatur diktieren"></textarea></label>
-    <div class="bx" data-art="mangel"><label>Frist (optional)<input type="date" name="frist"></label></div>
+    <div class="bx" data-art="mangel">${opHausSeg(hn,h0)}<label>Frist (optional)<input type="date" name="frist"></label></div>
     <div class="bx" data-art="nachtrag"><div class="two"><label>Menge (optional)<input name="menge" inputmode="decimal" autocomplete="off"></label>
       <label>Einheit<input name="einheit" list="beEh" autocomplete="off"></label></div>
       <label>Angefordert von<select name="angefordert_von"><option value="">–</option>${opt(BE_VON,old&&old.angefordert_von)}</select></label>
@@ -415,6 +417,7 @@ async function beEntry(p,bid,eid,el){
       angefordert_von:a==='nachtrag'?val('angefordert_von'):null,bauherr_zahlt:a==='nachtrag'?(f.bauherr_zahlt.value||'offen'):null,
       dringend:a==='technik'?f.dringend.checked:null,dirty:1,rev:(base.rev||0)+1};
     const unchanged=old&&BE_FIELDS.every(k=>(old[k]??null)===(rec[k]??null));
+    if(a==='mangel'&&f.haus)opSetHaus(p.id,rec,+f.haus.value);
     await BeDB.tx(o=>{if(!unchanged)o.eintraege.put(rec);
       for(const q of removed){o.fotos.delete(q.id);if(q.srv)o.tomb.put({id:q.id,table:'besuch_fotos',uid:u,besuch_id:bid})}
       fotos.forEach((q,i)=>{if(q.isNew)o.fotos.put({id:q.id,eintrag_id:rec.id,besuch_id:bid,uid:u,pos:i,data:q.data,w:q.w,h:q.h,dirty:1,rev:1,srv:0})})});

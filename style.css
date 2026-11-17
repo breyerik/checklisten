@@ -94,3 +94,6 @@ fieldset{border:1px solid #ddd;border-radius:10px}.radio{display:flex!important;
 #opDlg{max-height:92vh;overflow:auto}
 .opf select#opSort{flex:1 1 50%}.opf input#opQ{flex:1 1 50%}
 #opForm .two label{margin:10px 0}
+.chip.haus{font-size:12px;padding:1px 6px;border-radius:6px;background:#1f4e79;border-color:#1f4e79;color:#fff;font-weight:600}
+.beform .lbl{font-size:13px;color:#555;margin:2px 0 4px}.seg.haus span{padding:9px 2px}
+.opf.ophn{margin-top:14px}.opf.ophn label{flex:1;display:flex;align-items:center;gap:8px;font-size:14px;color:#555}.opf.ophn select{flex:0 0 96px}

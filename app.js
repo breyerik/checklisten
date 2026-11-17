@@ -28,7 +28,7 @@ function hub(p){
 function preise(){$('#title').textContent='Preisdatenbank';backTo('‹ Projekte','');prView(main)}
 function plan(p){$('#title').textContent=p.name;backTo('‹ Übersicht','#/'+p.id);bzpView(p,main)}
 function list(){
-  $('#title').textContent='Bauvorhaben';$('#back').style.visibility='hidden';
+  $('#title').textContent='Bauleitung';$('#back').style.visibility='hidden';
   let h=st.projects.length?'':'<div class="empty">Noch kein Bauvorhaben angelegt.<br>Tippe auf „+ Neues Bauvorhaben“.</div>';
   for(const p of st.projects){const g=prog(p);
     h+=`<div class="card proj"><a class="info" href="#/${p.id}" style="color:inherit;text-decoration:none"><b>${esc(p.name)}</b>

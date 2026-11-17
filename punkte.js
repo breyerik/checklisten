@@ -3,7 +3,19 @@
 // Besuch-Punkte: Text gehört dem Besuchsprotokoll; hier änderbar sind nur Status (erledigt), Rückmeldung der Firma und Notiz.
 const OP_Q={besuch:'Besuch',email:'E-Mail',telefon:'Telefon',sonstiges:'Sonstiges'};
 const OP_MAXFOTOS=3;
-const opSt={show:'offen',sort:'neu',gewerk:'',firma:'',bv:'',q:''};
+const opSt={show:'offen',sort:'neu',gewerk:'',firma:'',bv:'',haus:'',q:''};
+// Häuser / Wohneinheiten je Bauvorhaben (p.haeuser, im Projektstand = Cloud-Sync, keine Datenbank-Änderung nötig).
+// Zuordnung Punkt → Haus liegt in p.haus[punktId]={h,t}. Ohne Zuordnung wird „Haus 2“ o. ä. aus der Stelle übernommen.
+const OP_HMAX=20,OP_HAUS_RE=/\b(?:haus|wohneinheit|we)\s*(\d{1,2})\b/i;
+const opProj=id=>st.projects.find(p=>p.id===id);
+function opHausN(p){if(!p)return 0;if(p.haeuser!=null)return Math.max(0,Math.min(OP_HMAX,+p.haeuser||0));
+  try{return glFor(p).some(L=>L.id==='el')?4:0}catch(e){return 0}} // VBW 6: 4 Häuser vorbelegt
+function opHausOf(x,p){p=p||opProj(x.projekt_id);const n=opHausN(p);if(!n)return 0;const a=p.haus&&p.haus[x.id];
+  if(a)return a.h>0&&a.h<=n?+a.h:0;const m=String(x.stelle||'').match(OP_HAUS_RE),h=m?+m[1]:0;return h>=1&&h<=n?h:0}
+function opSetHaus(pid,x,h){const p=opProj(pid);h=+h||0;if(!p||opHausOf(x,p)===h)return;const t=Date.now();
+  p.haus={...(p.haus||{}),[x.id]:{h,t}};p.mod=t;save()}
+function opHausSeg(n,cur){if(!n)return'';return`<div class="lbl">Haus</div><div class="seg haus">${[0,...Array.from({length:n},(_,i)=>i+1)].map(k=>
+  `<label><input type="radio" name="haus" value="${k}"${k===cur?' checked':''}><span>${k?k:'–'}</span></label>`).join('')}</div>`}
 const opCmp=(a,b)=>String(a||'').localeCompare(String(b||''),'de',{sensitivity:'base'});
 const opDays=d=>d?Math.max(0,Math.round((Date.parse(beToday())-Date.parse(d))/864e5)):0;
 // Alle Punkte (lokal): Besuch-Punkte aus den Mangel-Einträgen + Status-Zeilen, plus selbst angelegte
@@ -16,6 +28,7 @@ async function opItems(pid){
       notiz:s.notiz||null,erledigt_von:s.erledigt_von||null,dirty:!!(s.dirty||e.dirty),fotos:[]})}
   for(const x of ps){if(x.quelle==='besuch'||(pid&&x.projekt_id!==pid))continue;
     out.push({...x,manual:true,bv:proj(x.projekt_id)||x.bv,dirty:!!x.dirty,fotos:pfs.filter(f=>f.punkt_id===x.id).sort((a,b)=>a.pos-b.pos)})}
+  for(const x of out)x.haus=opHausOf(x);
   return out}
 const opIsDone=x=>!!x.erledigt_am;
 // Zeile in „punkte“ schreiben (Besuch-Punkte: Status-Zeile bei Bedarf neu anlegen, id = Eintrags-id)
@@ -39,33 +52,34 @@ async function opView(p,el){
   if(p)backTo('‹ Übersicht','#/'+p.id);else backTo('‹ Projekte','');
   if(!Sync||!Sync.user||!BeDB)return beLoginCard(el,'Offene Punkte');
   if(pid)opSt.bv='';if(pid&&opSt.sort==='bv')opSt.sort='neu';
-  const h=beHash();let items=[],sig='';
+  const h=beHash();let items=[],sig='';const hn=p?opHausN(p):Math.max(0,...st.projects.map(opHausN));
+  if(!hn&&opSt.sort==='haus')opSt.sort='neu';if(!hn)opSt.haus='';
   el.innerHTML=`<div class="row" style="margin:0 0 10px"><button class="pri" id="opNew">+ Neuer Punkt (E-Mail / Telefon)</button></div>
     <div id="beStat" class="bestat"></div><div id="opMiss" class="bestat wait" hidden>⚠️ Auf dem Server ist „Offene Punkte“ noch nicht eingerichtet. Änderungen bleiben vorerst nur auf diesem Gerät.</div>
     <div class="seg" id="opSeg"></div>
     <div class="opf"><select id="opSort" aria-label="Sortierung">
       <option value="neu">Neueste zuerst</option><option value="alt">Älteste zuerst</option>
-      <option value="gewerk">Nach Gewerk</option><option value="firma">Nach Firma</option><option value="frist">Nach Frist</option>${pid?'':'<option value="bv">Nach Bauvorhaben</option>'}</select>
+      <option value="gewerk">Nach Gewerk</option><option value="firma">Nach Firma</option><option value="frist">Nach Frist</option>${hn?'<option value="haus">Nach Haus</option>':''}${pid?'':'<option value="bv">Nach Bauvorhaben</option>'}</select>
       <input id="opQ" type="search" placeholder="Suchen" autocomplete="off"></div>
-    <div class="opf"><select id="opGw" aria-label="Gewerk"></select><select id="opFi" aria-label="Firma"></select>${pid?'':'<select id="opBv" aria-label="Bauvorhaben"></select>'}</div>
-    <div id="opList"></div>`;
+    <div class="opf"><select id="opGw" aria-label="Gewerk"></select><select id="opFi" aria-label="Firma"></select>${pid?'':'<select id="opBv" aria-label="Bauvorhaben"></select>'}${hn?'<select id="opHs" aria-label="Haus"></select>':''}</div>
+    <div id="opList"></div>${p?`<div class="opf ophn"><label>Häuser / Wohneinheiten in diesem BV<select id="opHn">${[0,...Array.from({length:OP_HMAX-1},(_,i)=>i+2)].map(k=>`<option value="${k}"${k===hn?' selected':''}>${k?k:'keine'}</option>`).join('')}</select></label></div>`:''}`;
   const seg=$('#opSeg'),sort=$('#opSort'),q=$('#opQ');sort.value=opSt.sort;q.value=opSt.q;
   const uniq=a=>[...new Set(a.map(s=>String(s||'').trim()).filter(Boolean))].sort(opCmp);
   const fillSel=(id,all,vals,key)=>{const s=$(id);if(!s)return;if(!vals.includes(opSt[key]))opSt[key]='';
     s.innerHTML=`<option value="">${all}</option>`+vals.map(v=>`<option value="${beE(v)}"${v===opSt[key]?' selected':''}>${beE(v)}</option>`).join('')};
   const filtered=()=>{const t=opSt.q.trim().toLowerCase();
     return items.filter(x=>(opSt.show==='alle'||(opSt.show==='erledigt')===opIsDone(x))&&(!opSt.gewerk||(x.gewerk||'').trim()===opSt.gewerk)&&(!opSt.firma||(x.firma||'').trim()===opSt.firma)
-      &&(!opSt.bv||x.bv===opSt.bv)&&(!t||[x.gewerk,x.firma,x.stelle,x.beschreibung,x.notiz,x.bv].some(v=>String(v||'').toLowerCase().includes(t))))}
+      &&(!opSt.bv||x.bv===opSt.bv)&&(!opSt.haus||String(x.haus||0)===opSt.haus)&&(!t||[x.gewerk,x.firma,x.stelle,x.beschreibung,x.notiz,x.bv].some(v=>String(v||'').toLowerCase().includes(t))))}
   const byDate=(a,b)=>String(a.angelegt_am||'').localeCompare(String(b.angelegt_am||''))||String(a.created_at||'').localeCompare(String(b.created_at||''));
   const sorter=()=>{const s=opSt.sort,dn=(a,b)=>opIsDone(a)-opIsDone(b); // „Alle“: erledigte unten
     const f={neu:(a,b)=>byDate(b,a),alt:byDate,gewerk:(a,b)=>opCmp(a.gewerk||'\uffff',b.gewerk||'\uffff')||byDate(a,b),firma:(a,b)=>opCmp(a.firma||'\uffff',b.firma||'\uffff')||byDate(a,b),
-      bv:(a,b)=>opCmp(a.bv,b.bv)||byDate(a,b),frist:(a,b)=>String(a.frist||'9999').localeCompare(String(b.frist||'9999'))||byDate(a,b)}[s]||byDate;
+      bv:(a,b)=>opCmp(a.bv,b.bv)||byDate(a,b),haus:(a,b)=>(a.haus||99)-(b.haus||99)||byDate(a,b),frist:(a,b)=>String(a.frist||'9999').localeCompare(String(b.frist||'9999'))||byDate(a,b)}[s]||byDate;
     return(a,b)=>dn(a,b)||f(a,b)};
   const card=x=>{const done=opIsDone(x),late=!done&&x.frist&&x.frist<beToday();
     const title=[x.gewerk,x.firma].filter(Boolean).join(' · ')||'–';
     const meta=[x.stelle,(pid?'':x.bv),`${x.manual&&x.quelle!=='besuch'?'Eingang':'angelegt'} ${beDate(x.angelegt_am)}`+(!done&&opDays(x.angelegt_am)>0?` (seit ${opDays(x.angelegt_am)} ${opDays(x.angelegt_am)===1?'Tag':'Tagen'})`:'')].filter(Boolean).map(beE).join(' · ');
     return`<div class="card op ${done?'done':''}" data-id="${x.id}"><input type="checkbox" class="opck" data-id="${x.id}" ${done?'checked':''} aria-label="${done?'wieder öffnen':'abhaken'}">
-      <div class="opb" data-edit="${x.id}"><div class="beet"><b>${beE(title)}</b><span class="chip art q${x.quelle}">${OP_Q[x.quelle]||x.quelle}</span>${x.dirty?'<span class="muted" title="noch nicht hochgeladen">⏳</span>':''}</div>
+      <div class="opb" data-edit="${x.id}"><div class="beet"><b>${beE(title)}</b>${x.haus?`<span class="chip haus">Haus ${x.haus}</span>`:''}<span class="chip art q${x.quelle}">${OP_Q[x.quelle]||x.quelle}</span>${x.dirty?'<span class="muted" title="noch nicht hochgeladen">⏳</span>':''}</div>
       <div class="muted">${meta}</div>${x.beschreibung?`<div class="bed">${beE(x.beschreibung)}</div>`:''}
       ${x.frist?`<span class="chip fr ${late?'late':''}">Frist ${beDate(x.frist)}</span> `:''}${x.rueckmeldung_am&&!done?`<span class="chip rm">Firma meldet erledigt am ${beDate(x.rueckmeldung_am)} – prüfen</span>`:''}
       ${x.notiz?`<div class="opn">📝 ${beE(x.notiz)}</div>`:''}
@@ -74,7 +88,7 @@ async function opView(p,el){
   const drawList=()=>{const all=items,c={offen:all.filter(x=>!opIsDone(x)).length};c.erledigt=all.length-c.offen;c.alle=all.length;
     seg.innerHTML=[['offen','Offen'],['erledigt','Erledigt'],['alle','Alle']].map(([k,l])=>`<label><input type="radio" name="opShow" value="${k}"${opSt.show===k?' checked':''}><span>${l} (${c[k]})</span></label>`).join('');
     seg.querySelectorAll('input').forEach(i=>i.onchange=()=>{opSt.show=i.value;drawList()});
-    const rows=filtered().sort(sorter()),grp={gewerk:x=>x.gewerk||'Ohne Gewerk',firma:x=>x.firma||'Ohne Firma',bv:x=>x.bv}[opSt.sort];
+    const rows=filtered().sort(sorter()),grp={gewerk:x=>x.gewerk||'Ohne Gewerk',firma:x=>x.firma||'Ohne Firma',bv:x=>x.bv,haus:x=>x.haus?'Haus '+x.haus:'Ohne Haus'}[opSt.sort];
     let x='';
     if(!rows.length)x=`<div class="empty">${!all.length?'Noch keine offenen Punkte.<br>Sie entstehen automatisch aus den Besuchsprotokollen – oder tippe auf „+ Neuer Punkt“, wenn du etwas per E-Mail oder Telefon bekommen hast.'
       :opSt.show==='offen'&&c.offen===0?'Alles erledigt 🎉':'Keine Punkte für diesen Filter.'}</div>`;
@@ -93,9 +107,11 @@ async function opView(p,el){
   const draw=async()=>{items=await opItems(pid);if(beHash()!==h)return;
     const s=JSON.stringify([items.map(i=>[i.gewerk,i.firma,i.bv])]);
     if(s!==sig){sig=s;fillSel('#opGw','Alle Gewerke',uniq(items.map(i=>i.gewerk)),'gewerk');fillSel('#opFi','Alle Firmen',uniq(items.map(i=>i.firma)),'firma');fillSel('#opBv','Alle BV',uniq(items.map(i=>i.bv)),'bv')}
+    const hs=$('#opHs');if(hs){if(opSt.haus&&+opSt.haus>hn)opSt.haus='';hs.innerHTML=`<option value="">Alle Häuser</option>${Array.from({length:hn},(_,i)=>i+1).map(k=>`<option value="${k}"${String(k)===opSt.haus?' selected':''}>Haus ${k} (${items.filter(i=>i.haus===k&&!opIsDone(i)).length} offen)</option>`).join('')}<option value="0"${opSt.haus==='0'?' selected':''}>Ohne Haus</option>`}
     $('#opMiss').hidden=!BE.opMissing;drawList();beStat(null)};
   sort.onchange=()=>{opSt.sort=sort.value;drawList()};q.oninput=()=>{opSt.q=q.value;drawList()};
-  for(const[id,k]of[['#opGw','gewerk'],['#opFi','firma'],['#opBv','bv']]){const s=$(id);if(s)s.onchange=()=>{opSt[k]=s.value;drawList()}}
+  const hns=$('#opHn');if(hns)hns.onchange=()=>{p.haeuser=+hns.value;p.mod=Date.now();save();opSt.haus='';opView(p,el)};
+  for(const[id,k]of[['#opGw','gewerk'],['#opFi','firma'],['#opBv','bv'],['#opHs','haus']]){const s=$(id);if(s)s.onchange=()=>{opSt[k]=s.value;drawList()}}
   $('#opNew').onclick=()=>opEdit(null,p,items,draw);
   beSubView={h,bid:null,draw};$('#opList').innerHTML='<div class="empty">Lade Punkte …</div>';await draw();BE.kick(100);
 }
@@ -111,8 +127,10 @@ async function opEdit(it,p,items,redraw){
   const fotos=it&&it.manual?it.fotos.map(f=>({...f})):[],removed=[];let busy=0;
   const v=k=>beE(it&&it[k]||'');
   const quelle=it&&it.quelle!=='besuch'?it.quelle:'email';
+  const h0=it?it.haus||0:(+opSt.haus||0);
   d.innerHTML=`<form id="opForm" class="beform" novalidate><h2>${isNew?'Neuer offener Punkt':ro?'Offener Punkt':'Punkt bearbeiten'}</h2>
     ${isNew&&!p?`<label>Bauvorhaben<select name="pid">${projs.map(x=>`<option value="${beE(x.id)}"${x.id===pid0?' selected':''}>${beE(x.name)}</option>`).join('')}</select></label>`:''}
+    <div id="opHaus">${opHausSeg(opHausN(opProj(pid0)),h0)}</div>
     ${ro?`<div class="card" style="margin:0 0 10px"><div class="muted">Aus dem Besuch vom ${beDate(it.angelegt_am)} · <a href="#/${it.projekt_id}/besuch/${it.besuch_id}">Besuch öffnen</a></div>
       <div style="margin-top:4px"><b>${beE([it.gewerk,it.firma].filter(Boolean).join(' · ')||'–')}</b></div>${it.stelle?`<div class="muted">${beE(it.stelle)}</div>`:''}
       ${it.beschreibung?`<div class="bed">${beE(it.beschreibung)}</div>`:''}${it.frist?`<div class="muted">Frist: ${beDate(it.frist)}</div>`:''}</div>`
@@ -137,6 +155,7 @@ async function opEdit(it,p,items,redraw){
   const f=d.querySelector('#opForm'),$d=s=>d.querySelector(s);
   const al=()=>{const a=$d('#opAl'),q=f.quelle&&f.quelle.value;if(a)a.textContent=q==='sonstiges'?'Angelegt am':q==='telefon'?'Anruf am':'E-Mail vom'};
   if(f.quelle){al();f.addEventListener('change',e=>{if(e.target.name==='quelle')al()})}
+  if(f.pid)f.pid.addEventListener('change',()=>{const c=f.haus?+f.haus.value:h0;$d('#opHaus').innerHTML=opHausSeg(opHausN(opProj(f.pid.value)),c)});
   const thumbs=()=>{const t=$d('#opTh');if(!t)return;
     t.innerHTML=fotos.map((q,i)=>`<span class="th">${q.data?`<img src="data:image/jpeg;base64,${q.data}" alt="">`:'<span class="thx">📷</span>'}<button type="button" data-i="${i}" aria-label="Foto entfernen">✕</button></span>`).join('');
     t.querySelectorAll('button').forEach(b=>b.onclick=()=>{const[q]=fotos.splice(+b.dataset.i,1);if(!q.isNew)removed.push(q);thumbs()});
@@ -155,12 +174,14 @@ async function opEdit(it,p,items,redraw){
     const val=k=>f[k]?(f[k].value.trim()||null):null,now=new Date().toISOString();
     const status={rueckmeldung_am:val('rueckmeldung_am'),notiz:val('notiz'),erledigt_am:val('erledigt_am')};
     status.erledigt_von=status.erledigt_am?((it&&it.erledigt_von)||Sync.user.email||null):null;
-    if(ro){await opPatch(it,status)}
+    const hv=f.haus?+f.haus.value:null;
+    if(ro){await opPatch(it,status);if(hv!=null)opSetHaus(it.projekt_id,it,hv)}
     else{const txt=val('beschreibung');if(!txt&&!val('gewerk')&&!val('firma')&&!fotos.length){$d('#opErr').textContent='Bitte mindestens eine Beschreibung eintragen.';f.beschreibung.focus();return}
       const pid=it?it.projekt_id:(p?p.id:f.pid.value),pj=st.projects.find(x=>x.id===pid);
       const row={...(it?await BeDB.get('punkte',it.id):{id:beUuid(),uid:u,created_at:now,rev:0,srv:0}),projekt_id:pid,bv:pj?pj.name:(it&&it.bv)||'',quelle:f.quelle.value,
         gewerk:val('gewerk'),firma:val('firma'),stelle:val('stelle'),beschreibung:txt,frist:val('frist'),angelegt_am:val('angelegt_am')||beToday(),...status};
       row.dirty=1;row.rev=(row.rev||0)+1;
+      if(hv!=null)opSetHaus(pid,row,hv);
       await BeDB.tx(o=>{o.punkte.put(row);
         for(const q of removed){o.pfotos.delete(q.id);if(q.srv)o.tomb.put({id:q.id,table:'offene_punkte_fotos',uid:u})}
         fotos.forEach((q,i)=>{if(q.isNew)o.pfotos.put({id:q.id,punkt_id:row.id,uid:u,pos:i,data:q.data,w:q.w,h:q.h,dirty:1,rev:1,srv:0})})});
