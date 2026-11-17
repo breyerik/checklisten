@@ -62,6 +62,7 @@ async function opView(p,el){
       <option value="gewerk">Nach Gewerk</option><option value="firma">Nach Firma</option><option value="frist">Nach Frist</option>${hn?'<option value="haus">Nach Haus</option>':''}${pid?'':'<option value="bv">Nach Bauvorhaben</option>'}</select>
       <input id="opQ" type="search" placeholder="Suchen" autocomplete="off"></div>
     <div class="opf"><select id="opGw" aria-label="Gewerk"></select><select id="opFi" aria-label="Firma"></select>${pid?'':'<select id="opBv" aria-label="Bauvorhaben"></select>'}${hn?'<select id="opHs" aria-label="Haus"></select>':''}</div>
+    <div class="row oppdf"><button class="sec" id="opPdf" type="button">📄 PDF exportieren</button></div>
     <div id="opList"></div>${p?`<div class="opf ophn"><label>Häuser / Wohneinheiten in diesem BV<select id="opHn">${[0,...Array.from({length:OP_HMAX-1},(_,i)=>i+2)].map(k=>`<option value="${k}"${k===hn?' selected':''}>${k?k:'keine'}</option>`).join('')}</select></label></div>`:''}`;
   const seg=$('#opSeg'),sort=$('#opSort'),q=$('#opQ');sort.value=opSt.sort;q.value=opSt.q;
   const uniq=a=>[...new Set(a.map(s=>String(s||'').trim()).filter(Boolean))].sort(opCmp);
@@ -95,6 +96,11 @@ async function opView(p,el){
     let cur=null;for(const r of rows){if(grp){const g=grp(r);if(g!==cur){cur=g;x+=`<div class="beg">${beE(g)} <span class="muted">(${rows.filter(y=>grp(y)===g).length})</span></div>`}}x+=card(r)}
     if(opSt.show==='offen'&&rows.length>1)x+=`<div class="row"><button class="sec" id="opAll">Alle ${rows.length} angezeigten als erledigt markieren</button></div>`;
     $('#opList').innerHTML=x;
+    const pb=$('#opPdf');if(pb){pb.textContent=`📄 PDF exportieren (${rows.length} ${rows.length===1?'Punkt':'Punkte'})`;pb.disabled=!rows.length;
+      pb.onclick=()=>{const fl=[['Status',{offen:'Offen',erledigt:'Erledigt',alle:'Alle'}[opSt.show]]];
+        if(opSt.gewerk)fl.push(['Gewerk',opSt.gewerk]);if(opSt.firma)fl.push(['Firma',opSt.firma]);if(opSt.bv)fl.push(['Bauvorhaben',opSt.bv]);
+        if(opSt.haus)fl.push(['Haus',opSt.haus==='0'?'Ohne Haus':'Haus '+opSt.haus]);if(opSt.q.trim())fl.push(['Suche',`„${opSt.q.trim()}“`]);
+        opSharePdf(rows.slice(),grp||null,{titel:p?p.name:'Alle Bauvorhaben',stand:beDT(new Date().toISOString()),user:Sync.user&&Sync.user.email,filter:fl,sort:OP_SORTL[opSt.sort]||opSt.sort,showBv:!pid},pb)}}
     const find=id=>items.find(i=>i.id===id);
     $('#opList').querySelectorAll('.opck').forEach(cb=>cb.onchange=async()=>{const it=find(cb.dataset.id);if(!it)return;
       if(cb.checked){await opPatch(it,{erledigt_am:beToday(),erledigt_von:Sync.user.email||null});opToast('Als erledigt markiert',()=>opPatch(it,{erledigt_am:null,erledigt_von:null}).then(draw))}
@@ -189,3 +195,65 @@ async function opEdit(it,p,items,redraw){
     d.close();redraw()};
   d.showModal();
 }
+
+// ---------- PDF-Export der aktuell angezeigten Liste (jsPDF aus vendor/, gleiche Filter/Sortierung/Gruppen wie am Bildschirm) ----------
+const OP_SORTL={neu:'Neueste zuerst',alt:'Älteste zuerst',gewerk:'Nach Gewerk',firma:'Nach Firma',frist:'Nach Frist',haus:'Nach Haus',bv:'Nach Bauvorhaben'};
+// J: jsPDF-Konstruktor; rows: angezeigte Punkte in Anzeige-Reihenfolge; grp: Gruppenfunktion oder null; meta: {titel,stand,user,filter:[[k,v]],sort,showBv}
+function opPdf(J,rows,grp,meta){
+  const doc=new J({unit:'mm',format:'a4',compress:true}),W=210,H=297,M=15,CW=W-2*M,BOT=H-16,A=beAnsi;let y=M;
+  const INK=[25,25,25],GREY=[95,94,91],LINE=[230,229,226];
+  const need=h=>{if(y+h>BOT){doc.addPage();y=M;return true}return false};
+  const lines=(t,size,bold,w)=>{doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);return doc.splitTextToSize(A(t),w)};
+  const put=(ls,x,size,bold,color,lh)=>{doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(...color);for(const l of ls){doc.text(l,x,y+lh*0.8);y+=lh}};
+  // Kopf
+  put(['Offene Punkte'],M,22,true,INK,9);y+=1;
+  put(lines(meta.titel,13,true,CW),M,13,true,INK,5.6);y+=1.5;
+  const kv=[['Stand',meta.stand],...(meta.user?[['Erstellt von',meta.user]]:[]),...meta.filter,['Sortierung',meta.sort],['Anzahl',`${rows.length} ${rows.length===1?'Punkt':'Punkte'}`]];
+  for(const[k,v]of kv){doc.setFont('helvetica','bold');doc.setFontSize(9.5);doc.setTextColor(...GREY);doc.text(A(k),M,y+3.4);
+    const ls=lines(v,9.5,false,CW-32);put(ls,M+32,9.5,false,INK,4.3)}
+  y+=2;doc.setDrawColor(...INK);doc.setLineWidth(0.4);doc.line(M,y,W-M,y);y+=5;
+  if(!rows.length){put(['Keine Punkte für diese Auswahl.'],M,11,false,GREY,5);}
+  // Punkte
+  const fields=x=>{const f=[];if(x.haus)f.push(['Haus','Haus '+x.haus]);if(x.stelle)f.push(['Stelle',x.stelle]);if(meta.showBv&&x.bv)f.push(['Bauvorhaben',x.bv]);
+    f.push(['Quelle',(OP_Q[x.quelle]||x.quelle||'')+` · ${x.manual&&x.quelle!=='besuch'?'Eingang':'angelegt'} ${beDate(x.angelegt_am)}`]);
+    if(x.frist)f.push(['Frist',beDate(x.frist)]);if(x.rueckmeldung_am)f.push(['Rückmeldung','Firma meldet erledigt am '+beDate(x.rueckmeldung_am)]);
+    if(x.notiz)f.push(['Notiz',x.notiz]);return f};
+  const status=x=>opIsDone(x)?['erledigt '+beDate(x.erledigt_am),[47,125,79]]:x.frist&&x.frist<beToday()?['überfällig',[196,56,44]]:['offen',[11,107,203]];
+  const TH=24;let nr=0,cur=null;
+  for(const x of rows){nr++;
+    const title=`${nr}. ${[x.gewerk,x.firma].filter(Boolean).join(' · ')||'–'}`,[stt,stc]=status(x);
+    doc.setFont('helvetica','bold');doc.setFontSize(9);const sw=doc.getTextWidth(A(stt))+5;
+    const tl=lines(title,11,true,CW-sw-6),bl=x.beschreibung?lines(x.beschreibung,10.5,false,CW-4):[];
+    const fl=fields(x).map(([k,v])=>[k,lines(v,9.5,false,CW-30)]);const fotos=(x.fotos||[]).filter(f=>f.data).slice(0,3);
+    const est=tl.length*5+bl.length*4.7+fl.reduce((s,[,l])=>s+l.length*4.2,0)+(fotos.length?TH+3:0)+7;
+    if(grp){const g=grp(x);if(g!==cur){cur=g;need(12+Math.min(est,60));const n=rows.filter(r=>grp(r)===g).length;
+      doc.setFillColor(241,241,239);doc.roundedRect(M,y,CW,8.5,1.5,1.5,'F');doc.setFont('helvetica','bold');doc.setFontSize(12);doc.setTextColor(...INK);
+      doc.text(A(g),M+3,y+5.9);doc.setFont('helvetica','normal');doc.setFontSize(10);doc.setTextColor(...GREY);doc.text(`${n} ${n===1?'Punkt':'Punkte'}`,W-M-3,y+5.9,{align:'right'});y+=12}}
+    need(Math.min(est,BOT-M));
+    const y0=y;put(tl,M+1,11,true,opIsDone(x)?GREY:INK,5);
+    doc.setFillColor(...stc.map(c=>Math.round(c+(255-c)*0.86)));doc.roundedRect(W-M-sw,y0+0.3,sw,5,1.2,1.2,'F');doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(...stc);doc.text(A(stt),W-M-sw/2,y0+3.8,{align:'center'});
+    if(bl.length){y+=0.5;for(const l of bl){need(4.7);put([l],M+1,10.5,false,INK,4.7)}}
+    y+=0.8;for(const[k,ls]of fl){ls.forEach((l,i)=>{need(4.2);if(!i){doc.setFont('helvetica','bold');doc.setFontSize(9);doc.setTextColor(...GREY);doc.text(A(k),M+1,y+3.4)}put([l],M+30,9.5,false,INK,4.2)})}
+    if(fotos.length){need(TH+3);let fx=M+1;for(const f of fotos){try{const src='data:image/jpeg;base64,'+f.data,pr=doc.getImageProperties(src),s=TH/pr.height,w=Math.min(pr.width*s,45);
+      doc.addImage(src,'JPEG',fx,y+1,w,TH,f.id||undefined,'FAST');fx+=w+2}catch(e){}}y+=TH+3}
+    y+=1.5;doc.setDrawColor(...LINE);doc.setLineWidth(0.2);doc.line(M,y,W-M,y);y+=3.5}
+  const pages=doc.getNumberOfPages();
+  for(let i=1;i<=pages;i++){doc.setPage(i);doc.setFont('helvetica','normal');doc.setFontSize(8);doc.setTextColor(120,120,120);
+    doc.text(A(`Offene Punkte · ${meta.titel} · ${meta.stand}`),M,H-8);doc.text(`Seite ${i} von ${pages}`,W-M,H-8,{align:'right'})}
+  return doc}
+const opPdfName=t=>`Offene-Punkte_${String(t).replace(/[^\wäöüÄÖÜß-]+/g,'_').replace(/^_+|_+$/g,'')||'Liste'}_${beToday()}.pdf`;
+async function opSharePdf(rows,grp,meta,btn){
+  const t=btn.textContent;btn.disabled=true;btn.textContent='PDF wird erstellt …';let blob;const name=opPdfName(meta.titel);
+  try{const J=await beLoadPdf();blob=opPdf(J,rows,grp,meta).output('blob')}
+  catch(e){alert('Das PDF konnte nicht erstellt werden: '+e.message);return}
+  finally{btn.disabled=false;btn.textContent=t}
+  window._opLastPdf={name,blob};
+  const file=new File([blob],name,{type:'application/pdf'});
+  const dl=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000)};
+  let can=false;try{can=!!(navigator.canShare&&navigator.canShare({files:[file]}))}catch(e){}
+  if(!can){dl();return}
+  let d=$('#opPdfDlg');if(!d){d=document.createElement('dialog');d.id='opPdfDlg';document.body.appendChild(d)}
+  d.innerHTML=`<h2>PDF Offene Punkte</h2><p class="muted">${beE(name)} · ${rows.length} ${rows.length===1?'Punkt':'Punkte'} · ${Math.max(1,Math.round(blob.size/1024))} KB</p>
+    <div class="row"><button class="pri" id="opPdfShare">Teilen / Sichern …</button></div><div class="row"><button class="sec" id="opPdfDl">Herunterladen</button><button class="sec" id="opPdfX">Schließen</button></div>`;
+  d.querySelector('#opPdfShare').onclick=async()=>{try{await navigator.share({files:[file],title:name})}catch(e){if(e.name!=='AbortError')dl()}d.close()};
+  d.querySelector('#opPdfDl').onclick=()=>{dl();d.close()};d.querySelector('#opPdfX').onclick=()=>d.close();d.showModal()}

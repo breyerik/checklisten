@@ -1,4 +1,4 @@
-const C='bs-checklisten-v20';
+const C='bs-checklisten-v21';
 const F=['./','index.html','style.css','app.js','backup.js','sync.js','bzp.js','preise.js','besuch.js','punkte.js','gewerk.js','vendor/jspdf.umd.min.js','config.js','data.js','manifest.webmanifest','apple-touch-icon.png','icon-192.png','icon-512.png','icon-maskable-512.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(F)));self.skipWaiting()});
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(x=>x.startsWith('bs-checklisten-')&&x!==C).map(x=>caches.delete(x)))).then(()=>self.clients.claim())));

@@ -199,3 +199,4 @@ dialog a{color:var(--acc)}
 .empty{color:var(--ink2)}
 .prf{top:calc(env(safe-area-inset-top) + 100px)}
 .opf select{font-size:15px;padding-left:10px;padding-right:24px;background-position:right 8px center}
+.row.oppdf{margin:0 0 10px}.row.oppdf button{font-size:16px}.row.oppdf button:disabled{opacity:.5}
